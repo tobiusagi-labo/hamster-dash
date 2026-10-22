@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#fef3c7" />
+  <title>ハムダッシュ！ - Hamster Dash</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app-wrapper">
+    <div id="game-container">
+      <!-- Top HUD -->
+      <header id="hud" class="hidden mode-survival">
+        <div class="hud-top-row">
+          <div class="hud-stat">
+            <div class="score-box" id="score-box">
+              <span class="score-icon">🌻</span>
+              <span id="score-val">0</span>
+            </div>
+          </div>
+
+          <div class="hud-center">
+            <div id="combo-badge" class="combo-hidden">
+              <span id="combo-count">0</span> COMBO!
+            </div>
+          </div>
+
+          <div class="hud-right">
+            <button id="sound-btn" class="icon-btn" aria-label="サウンド切替">🔊</button>
+          </div>
+        </div>
+
+        <div class="timer-bar-wrapper">
+          <div class="timer-label-row">
+            <span>⏱️ TIME</span>
+            <span id="time-text">15.0s</span>
+          </div>
+          <div class="timer-bar-bg">
+            <div id="timer-bar-fill"></div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Game Canvas -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Step 1: Title Splash Overlay (Tap anywhere to go to Mode Select) -->
+      <div id="title-screen" class="overlay">
+        <div class="title-deco-bg">
+          <span class="deco-float deco-1">🌻</span>
+          <span class="deco-float deco-2">🧀</span>
+          <span class="deco-float deco-3">✨</span>
+          <span class="deco-float deco-4">🐾</span>
+          <span class="deco-float deco-5">🌼</span>
+          <span class="deco-float deco-6">💛</span>
+        </div>
+
+        <div class="title-splash-box" id="title-tap-area">
+          <div class="splash-badge">
+            <span class="badge-dot">🐾</span>
+            <span>SWEET &amp; HIGH-SPEED DASH</span>
+            <span class="badge-dot">🌻</span>
+          </div>
+
+          <div class="splash-logo-group">
+            <div class="splash-en-sub">― HAMSTER DASH! ―</div>
+            <h1 class="splash-title" aria-label="ハムダッシュ！">
+              <span class="char-pop c1">ハ</span><span class="char-pop c2">ム</span><span class="char-pop c3">ダ</span><span class="char-pop c4">ッ</span><span class="char-pop c5">シ</span><span class="char-pop c6">ュ</span><span class="char-pop c7">！</span>
+            </h1>
+            <div class="splash-subtitle-pill">✨ タップで超高速おやつ集め ✨</div>
+          </div>
+
+          <div class="title-hero-stage">
+            <canvas id="title-hero-canvas" width="240" height="216"></canvas>
+          </div>
+
+          <div class="tap-to-start">
+            <span class="tap-paw">🐾</span>
+            <span>画面をタップしてスタート</span>
+            <span class="tap-paw">🐾</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Mode Select Hub Overlay (Tap outside .hub-card to return to Title Screen) -->
+      <div id="mode-select-screen" class="overlay hidden">
+        <div class="hub-card" id="hub-card">
+          <!-- Top: モード選択の文字 -->
+          <div class="hub-top-header">
+            <div class="room-current-badge" id="room-current-badge">🏠 LIVING ROOM</div>
+            <h2 class="hub-title">モード選択</h2>
+            <p class="hub-sub" id="hub-sub-text">あそびたいモードをタップ！</p>
+          </div>
+
+          <!-- Middle Row: Large Left Mode Icon | Compact Front Whole-Body Hamster | Large Right Mode Icon -->
+          <div class="hub-middle-row">
+            <button class="hub-mode-icon-btn survival-theme" id="btn-survival">
+              <div class="hub-icon-circle">🔥</div>
+              <span class="hub-mode-label">サバイバル</span>
+              <span class="hub-mode-sub">時間回復・耐久</span>
+            </button>
+
+            <div class="hub-center-hamster">
+              <canvas id="hub-hamster-canvas" width="88" height="108"></canvas>
+            </div>
+
+            <button class="hub-mode-icon-btn timeattack-theme" id="btn-timeattack">
+              <div class="hub-icon-circle">⏱️</div>
+              <span class="hub-mode-label">60秒アタック</span>
+              <span class="hub-mode-sub">時間内スコア競走</span>
+            </button>
+          </div>
+
+          <!-- Bottom: 遊び方アイコン & 記録・集計アイコン -->
+          <div class="hub-bottom-row">
+            <button class="sub-hub-btn" id="btn-howto">
+              <span class="sub-hub-icon">📖</span>
+              <span class="sub-hub-text">遊び方</span>
+            </button>
+            <button class="sub-hub-btn stats-hub-btn" id="btn-stats">
+              <span class="sub-hub-icon">📊</span>
+              <span class="sub-hub-text">記録・集計</span>
+            </button>
+          </div>
+
+          <!-- Room Switcher Button at the bottom of Mode Select -->
+          <div class="hub-room-switch-row">
+            <button class="room-switch-btn" id="btn-room-toggle" type="button">
+              <span class="room-switch-pill active" id="pill-living">🏠 LIVINGROOM</span>
+              <span class="room-switch-arrow">⇄</span>
+              <span class="room-switch-pill" id="pill-rhythm">🎵 RHYTHMROOM</span>
+            </button>
+          </div>
+        </div>
+        <div class="outside-tap-hint">枠外をタップでタイトルへ戻る</div>
+      </div>
+
+      <!-- How-To-Play Modal -->
+      <div id="howto-modal" class="overlay hidden">
+        <div class="howto-card">
+          <h3 class="howto-title">📖 遊び方</h3>
+          <div class="rules-box">
+            <div class="rule-item">👆 <span>画面タップでその場所へ<strong>超高速直線ダッシュ</strong>！（止まる時に少し滑るよ）</span></div>
+            <div class="rule-item">🌻 <span>エサが消える前に<strong>素早く連続ゲット</strong>してコンボを繋ごう！</span></div>
+            <div class="rule-item">🧹 <span><strong>お掃除ロボ</strong>はエサやアイテムも吸引！増える<strong>毛糸玉・おもちゃ</strong>に当たると終了！</span></div>
+            <div class="rule-item">⏱️ <span><strong>金色の時計</strong>で周囲がスローに！<strong>紫の毒キノコ</strong>は自分が遅くなるので注意！</span></div>
+            <div class="rule-item">⛑️ <span>レアな<strong>ヘルメット</strong>を取ると、障害物に<strong>1度だけ当たっても跳ね返せる</strong>よ！</span></div>
+            <div class="rule-item">🎵 <span><strong>RHYTHMROOM</strong>では外周を回る<strong>8拍の光のリズム</strong>に合わせて移動！連続タップで予約移動もできるよ！</span></div>
+          </div>
+
+          <div class="food-guide-section">
+            <div class="food-guide-header">🍽️ エサの種類（早く消えるほど高得点！）</div>
+            <div class="food-guide-list">
+              <div class="food-guide-item">
+                <canvas class="food-guide-canvas" id="guide-food-seed" width="38" height="38"></canvas>
+                <div class="food-guide-info">
+                  <div class="food-guide-name-row">
+                    <span class="food-guide-name">ひまわりの種</span>
+                    <span class="food-guide-pts">100 pt</span>
+                  </div>
+                  <div class="food-guide-desc">よく出る基本のおやつ（サバイバル回復 +1.8秒）</div>
+                </div>
+              </div>
+
+              <div class="food-guide-item">
+                <canvas class="food-guide-canvas" id="guide-food-cheese" width="38" height="38"></canvas>
+                <div class="food-guide-info">
+                  <div class="food-guide-name-row">
+                    <span class="food-guide-name">濃厚チーズ</span>
+                    <span class="food-guide-pts cheese-pts">250 pt</span>
+                  </div>
+                  <div class="food-guide-desc">少しレアなごちそう！（サバイバル回復 +2.7秒）</div>
+                </div>
+              </div>
+
+              <div class="food-guide-item gold-guide-item">
+                <canvas class="food-guide-canvas" id="guide-food-gold" width="38" height="38"></canvas>
+                <div class="food-guide-info">
+                  <div class="food-guide-name-row">
+                    <span class="food-guide-name">黄金の種</span>
+                    <span class="food-guide-pts gold-pts">500 pt</span>
+                  </div>
+                  <div class="food-guide-desc">すぐ消える超レアおやつ！（サバイバル回復 +3.8秒）</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="primary-btn" id="btn-close-howto">とじる</button>
+        </div>
+      </div>
+
+      <!-- Records & Lifetime Stats Modal -->
+      <div id="stats-modal" class="overlay hidden">
+        <div class="stats-modal-card">
+          <h3 class="howto-title">📊 記録・集計</h3>
+
+          <div class="stats-section-label">🏆 ハイスコア</div>
+          <div class="stats-best-row">
+            <div class="stats-best-box survival-border">
+              <span class="stats-best-title">🔥 サバイバル</span>
+              <span class="stats-best-num" id="best-survival">0</span>
+            </div>
+            <div class="stats-best-box timeattack-border">
+              <span class="stats-best-title">⏱️ 60秒アタック</span>
+              <span class="stats-best-num" id="best-timeattack">0</span>
+            </div>
+          </div>
+
+          <div class="stats-section-label">📈 今までの累計・最高記録</div>
+          <div class="lifetime-grid">
+            <div class="lifetime-cell">
+              <span class="lifetime-label">🌻 今まで取ったエサ</span>
+              <span class="lifetime-val" id="total-foods-val">0個</span>
+            </div>
+            <div class="lifetime-cell">
+              <span class="lifetime-label">⏱️ 最長タイム</span>
+              <span class="lifetime-val" id="longest-time-val">0.0s</span>
+            </div>
+            <div class="lifetime-cell">
+              <span class="lifetime-label">⚡ 歴代最大コンボ</span>
+              <span class="lifetime-val" id="alltime-combo-val">0 COMBO</span>
+            </div>
+            <div class="lifetime-cell">
+              <span class="lifetime-label">🎮 総プレイ回数</span>
+              <span class="lifetime-val" id="total-plays-val">0回</span>
+            </div>
+          </div>
+
+          <div class="stats-section-label">🕒 最近のスコア履歴（直近10件）</div>
+          <div class="history-list" id="history-list">
+            <div class="history-empty">まだプレイ履歴がありません</div>
+          </div>
+
+          <button class="primary-btn" id="btn-close-stats">とじる</button>
+        </div>
+      </div>
+
+      <!-- Game Over / Clear Result Overlay -->
+      <div id="gameover-screen" class="overlay hidden">
+        <div class="result-card">
+          <div class="result-badge" id="result-reason">💥 障害物に激突！</div>
+          <h2 class="result-title" id="result-title-text">GAME OVER</h2>
+
+          <div class="result-score-panel">
+            <!-- Illustration corresponding to the Game Over cause or Full-Belly Clear! -->
+            <div class="result-illust-wrap">
+              <canvas id="result-illust-canvas" width="210" height="110"></canvas>
+            </div>
+            <div class="result-score-label">SCORE</div>
+            <div class="result-score-num" id="final-score">0</div>
+            <div id="new-record-badge" class="new-record hidden">✨ NEW RECORD! ✨</div>
+          </div>
+
+          <div class="result-stats-grid">
+            <div class="stat-cell">
+              <span class="stat-name">集めた餌</span>
+              <span class="stat-val" id="stat-foods">0個</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-name">最大コンボ</span>
+              <span class="stat-val" id="stat-max-combo">0</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-name">タイム</span>
+              <span class="stat-val" id="stat-time">0.0s</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-name">ハイスコア</span>
+              <span class="stat-val" id="stat-best">0</span>
+            </div>
+          </div>
+
+          <div class="result-actions">
+            <button class="primary-btn" id="btn-home">🏠 タイトル画面へ</button>
+            <button class="secondary-btn" id="btn-retry">🔄 同じモードでもう一度</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
