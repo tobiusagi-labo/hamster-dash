@@ -1519,52 +1519,23 @@
   function addDashEffect(x1, y1, x2, y2, isPoisoned = false) {
     const d = dist(x1, y1, x2, y2);
     if (d < 5) return;
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    const nx = -Math.sin(angle);
-    const ny = Math.cos(angle);
 
+    // Gentle, soft translucent trail without blinding bright white flashes
     dashStreaks.push({
       x1,
       y1,
       x2,
       y2,
-      width: isPoisoned ? 8 : 14,
+      width: isPoisoned ? 3.5 : 4.5,
       color: isPoisoned
-        ? 'rgba(168, 85, 247, 0.5)'
+        ? 'rgba(168, 85, 247, 0.32)'
         : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 0.65)'
-        : 'rgba(251, 191, 36, 0.55)',
-      coreColor: isPoisoned
-        ? 'rgba(74, 222, 128, 0.7)'
-        : roomType === 'rhythm'
-        ? 'rgba(34, 211, 238, 0.92)'
-        : 'rgba(255, 255, 255, 0.85)',
-      life: 0.28,
-      maxLife: 0.28,
+        ? 'rgba(236, 72, 153, 0.35)'
+        : 'rgba(245, 158, 11, 0.32)',
+      coreColor: null,
+      life: 0.16,
+      maxLife: 0.16,
     });
-
-    const numWindLines = Math.min(8, Math.max(3, Math.floor(d / 35)));
-    for (let i = 0; i < numWindLines; i++) {
-      const tStart = randRange(0.05, 0.65);
-      const segLen = randRange(28, 70);
-      const offset = (i % 2 === 0 ? 1 : -1) * randRange(8, 19);
-      const sx = x1 + (x2 - x1) * tStart + nx * offset;
-      const sy = y1 + (y2 - y1) * tStart + ny * offset;
-      const ex = sx + Math.cos(angle) * segLen;
-      const ey = sy + Math.sin(angle) * segLen;
-
-      dashStreaks.push({
-        x1: sx,
-        y1: sy,
-        x2: ex,
-        y2: ey,
-        width: randRange(2, 3.5),
-        color: isPoisoned ? 'rgba(192, 132, 252, 0.55)' : 'rgba(255, 255, 255, 0.78)',
-        coreColor: null,
-        life: randRange(0.18, 0.32),
-        maxLife: 0.32,
-      });
-    }
   }
 
   function addFloatingText(x, y, text, color = '#b45309', size = 16) {
@@ -1836,22 +1807,13 @@
       x: tx,
       y: ty,
       radius: 4,
-      maxRadius: 24,
-      alpha: 0.95,
+      maxRadius: 18,
+      alpha: 0.55,
       color: isPoisoned
-        ? 'rgba(168, 85, 247, 1)'
+        ? 'rgba(168, 85, 247, 0.75)'
         : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 1)'
-        : 'rgba(245, 158, 11, 1)',
-    });
-
-    targetRipples.push({
-      x: player.x,
-      y: player.y,
-      radius: 6,
-      maxRadius: 30,
-      alpha: 0.75,
-      color: 'rgba(255, 255, 255, 1)',
+        ? 'rgba(236, 72, 153, 0.75)'
+        : 'rgba(245, 158, 11, 0.75)',
     });
 
     addParticles(
@@ -1922,7 +1884,10 @@
       livingBgmStep = 0;
       sound.playLivingBgmStep(0);
     } else {
-      playRhythmTrackPreview(rhythmTrackIndex);
+      clearTrackPreview();
+      rhythmTimer = 0;
+      currentBeatIndex = 0;
+      sound.playRhythmBeat(0, rhythmTrackIndex);
     }
   });
 
@@ -1962,11 +1927,14 @@
     });
   }
 
+  let pauseOpenedTime = 0;
+
   function openPauseMenu() {
     if (state === 'GAMEOVER' || state === 'TITLE' || state === 'MODESELECT') return;
     sound.init();
     sound.playUIClick();
     isPaused = true;
+    pauseOpenedTime = Date.now();
     sound.syncVolumeUI();
     if (pauseModal) pauseModal.classList.remove('hidden');
   }
@@ -2011,6 +1979,8 @@
   if (pauseModal) {
     pauseModal.addEventListener('click', (e) => {
       if (e.target === pauseModal) {
+        // Prevent accidental backdrop closing from the same touch that opened the menu
+        if (Date.now() - pauseOpenedTime < 380) return;
         closePauseMenu();
       }
     });
@@ -2058,7 +2028,7 @@
         roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName})`;
       }
       if (hubSubText) {
-        hubSubText.textContent = '外周8拍のリズムで移動！ハムタップで選曲♪';
+        hubSubText.textContent = 'リズムに合わせて高速移動‼';
       }
       if (pillLiving) pillLiving.classList.remove('active');
       if (pillRhythm) pillRhythm.classList.add('active');
@@ -2082,10 +2052,12 @@
     btnRoomToggle.addEventListener('click', () => {
       sound.init();
       roomType = roomType === 'living' ? 'rhythm' : 'living';
+      clearTrackPreview();
       if (roomType === 'rhythm') {
-        playRhythmTrackPreview(rhythmTrackIndex);
+        rhythmTimer = 0;
+        currentBeatIndex = 0;
+        sound.playRhythmBeat(0, rhythmTrackIndex);
       } else {
-        clearTrackPreview();
         sound.playUIClick();
         livingBgmTimer = 0;
         livingBgmStep = 0;
@@ -2103,8 +2075,10 @@
       if (roomType === 'rhythm') {
         rhythmTrackIndex = (rhythmTrackIndex + 1) % RHYTHM_TRACKS.length;
         hamsterTapPulseTimer = 0.36;
+        rhythmTimer = 0;
+        currentBeatIndex = 0;
+        sound.playRhythmBeat(0, rhythmTrackIndex);
         updateRoomSwitchUI();
-        playRhythmTrackPreview(rhythmTrackIndex);
       } else {
         hamsterTapPulseTimer = 0.25;
         sound.playUIClick();
@@ -2244,6 +2218,18 @@
         livingBgmTimer -= LIVING_BGM_STEP_INTERVAL;
         livingBgmStep = (livingBgmStep + 1) % 32;
         sound.playLivingBgmStep(livingBgmStep);
+      }
+    }
+
+    // Play Rhythm Room groove BGM while in Mode Select (when RHYTHM ROOM is selected)
+    if (state === 'MODESELECT' && roomType === 'rhythm') {
+      const beatInterval = getRhythmBeatInterval();
+      rhythmTimer += rawDt;
+      while (rhythmTimer >= beatInterval) {
+        rhythmTimer -= beatInterval;
+        currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+        rhythmBeatPulse = 1.0;
+        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
       }
     }
 
@@ -2669,12 +2655,14 @@
         player.x = clamp(player.x, minX, maxX);
         player.y = clamp(player.y, minY, maxY);
 
-        player.afterimages.push({
-          x: player.x,
-          y: player.y,
-          angle: player.angle,
-          alpha: playerPoisonTimer > 0 ? 0.32 : 0.52,
-        });
+        if (s === 0 && player.afterimages.length < 3) {
+          player.afterimages.push({
+            x: player.x,
+            y: player.y,
+            angle: player.angle,
+            alpha: 0.25,
+          });
+        }
 
         if (Math.random() < 0.45) {
           particles.push({
@@ -3193,18 +3181,6 @@
         ctx.lineTo(ds.x2, ds.y2);
         ctx.stroke();
       }
-      ctx.restore();
-    }
-
-    if (player.isDashing) {
-      ctx.save();
-      ctx.strokeStyle = playerPoisonTimer > 0 ? 'rgba(168, 85, 247, 0.5)' : 'rgba(245, 158, 11, 0.5)';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(player.x, player.y);
-      ctx.lineTo(player.targetX, player.targetY);
-      ctx.stroke();
       ctx.restore();
     }
 
