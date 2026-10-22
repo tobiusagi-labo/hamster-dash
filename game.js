@@ -8,7 +8,7 @@
 
   // --- DOM Elements ---
   const canvas = document.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
   const hud = document.getElementById('hud');
   const scoreValEl = document.getElementById('score-val');
   const comboBadge = document.getElementById('combo-badge');
@@ -1023,11 +1023,27 @@
   // --- Resize Canvas ---
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
-    width = rect.width || 390;
-    height = rect.height || 740;
-    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    const newWidth = rect.width || 390;
+    const newHeight = rect.height || 740;
+    const newDpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const newCanvasW = Math.round(newWidth * newDpr);
+    const newCanvasH = Math.round(newHeight * newDpr);
+
+    // Prevent buffer wipes if dimensions haven't actually changed
+    if (
+      canvas.width === newCanvasW &&
+      canvas.height === newCanvasH &&
+      Math.abs(width - newWidth) < 0.5 &&
+      Math.abs(height - newHeight) < 0.5
+    ) {
+      return;
+    }
+
+    width = newWidth;
+    height = newHeight;
+    dpr = newDpr;
+    canvas.width = newCanvasW;
+    canvas.height = newCanvasH;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (state === 'TITLE' || state === 'MODESELECT') {
@@ -1517,25 +1533,8 @@
   }
 
   function addDashEffect(x1, y1, x2, y2, isPoisoned = false) {
-    const d = dist(x1, y1, x2, y2);
-    if (d < 5) return;
-
-    // Gentle, soft translucent trail without blinding bright white flashes
-    dashStreaks.push({
-      x1,
-      y1,
-      x2,
-      y2,
-      width: isPoisoned ? 3.5 : 4.5,
-      color: isPoisoned
-        ? 'rgba(168, 85, 247, 0.32)'
-        : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 0.35)'
-        : 'rgba(245, 158, 11, 0.32)',
-      coreColor: null,
-      life: 0.16,
-      maxLife: 0.16,
-    });
+    // Disabled to completely eliminate strobe lines during dashing
+    return;
   }
 
   function addFloatingText(x, y, text, color = '#b45309', size = 16) {
@@ -1801,28 +1800,15 @@
     } else {
       sound.playDash(isPoisoned);
     }
-    addDashEffect(player.x, player.y, tx, ty, isPoisoned);
 
-    targetRipples.push({
-      x: tx,
-      y: ty,
-      radius: 4,
-      maxRadius: 18,
-      alpha: 0.55,
-      color: isPoisoned
-        ? 'rgba(168, 85, 247, 0.75)'
-        : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 0.75)'
-        : 'rgba(245, 158, 11, 0.75)',
-    });
-
+    // Gentle tiny puff of dust without flashing streaks or strobe ripples
     addParticles(
       player.x,
       player.y,
       isPoisoned ? '#c084fc' : roomType === 'rhythm' ? '#f472b6' : '#fde047',
-      8,
-      0.85,
-      !isPoisoned
+      3,
+      0.45,
+      false
     );
   }
 
@@ -1850,22 +1836,42 @@
 
       rhythmTapQueue.push({ x: tx, y: ty });
       sound.playQueueTap(rhythmTapQueue.length);
-
-      targetRipples.push({
-        x: tx,
-        y: ty,
-        radius: 3,
-        maxRadius: 18,
-        alpha: 0.85,
-        color: 'rgba(56, 189, 248, 0.9)',
-      });
     } else {
       // LIVING ROOM: Immediate high-speed linear dash
       executeDashTo(tx, ty);
     }
   }
 
+  // --- Mobile Touch & Pointer Event Handlers (Zero-Flicker) ---
+  let lastCanvasTouchTime = 0;
+
+  canvas.addEventListener(
+    'touchstart',
+    (e) => {
+      e.preventDefault();
+      if (e.touches && e.touches.length > 0) {
+        lastCanvasTouchTime = Date.now();
+        const t = e.touches[0];
+        handleTap(t.clientX, t.clientY);
+      }
+    },
+    { passive: false }
+  );
+
+  canvas.addEventListener(
+    'touchmove',
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+
   canvas.addEventListener('pointerdown', (e) => {
+    // If handled by touchstart, ignore duplicate pointerdown
+    if (e.pointerType === 'touch' || Date.now() - lastCanvasTouchTime < 450) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     handleTap(e.clientX, e.clientY);
   });
@@ -2655,14 +2661,7 @@
         player.x = clamp(player.x, minX, maxX);
         player.y = clamp(player.y, minY, maxY);
 
-        if (s === 0 && player.afterimages.length < 3) {
-          player.afterimages.push({
-            x: player.x,
-            y: player.y,
-            angle: player.angle,
-            alpha: 0.25,
-          });
-        }
+        // Afterimages disabled for a completely clean, crisp, flicker-free movement
 
         if (Math.random() < 0.45) {
           particles.push({
@@ -2987,7 +2986,7 @@
     if (roomType === 'rhythm') {
       // Dark Nightclub / DJ Dancefloor Background for RHYTHM ROOM
       ctx.fillStyle = '#090414';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-20, -20, width + 40, height + 40);
 
       // Subtle dark club perspective grid lines
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
@@ -2995,8 +2994,8 @@
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
         ctx.stroke();
       }
 
@@ -3034,15 +3033,15 @@
     } else {
       // Warm Living Room Wooden Floor & Rug
       ctx.fillStyle = '#fef3c7';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-20, -20, width + 40, height + 40);
 
       ctx.strokeStyle = 'rgba(217, 119, 6, 0.13)';
       ctx.lineWidth = 2;
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
         ctx.stroke();
       }
 
@@ -5536,6 +5535,9 @@
   }
 
   function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
     ctx.save();
     if (screenShake > 0) {
       const sx = (Math.random() - 0.5) * screenShake;

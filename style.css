@@ -5,13 +5,22 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent !important;
   font-family: inherit;
 }
 
 html, body {
   width: 100%;
   height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  position: fixed;
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
   background: #1e1b18;
   font-family: 'Mochiy Pop One', 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Rounded Mplus 1c', 'Yu Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
   touch-action: none;
@@ -24,6 +33,9 @@ html, body {
   justify-content: center;
   align-items: center;
   background: radial-gradient(circle at center, #3b3026 0%, #171310 100%);
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  touch-action: none;
 }
 
 #game-container {
@@ -32,9 +44,12 @@ html, body {
   height: 100%;
   max-width: 460px;
   max-height: 900px;
-  background: #fef3c7;
+  background: #1e1b18;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 0 0 6px #453526;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  touch-action: none;
 }
 
 @media (max-width: 500px) {
@@ -59,6 +74,12 @@ html, body {
   height: 100%;
   cursor: pointer;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* HUD */
