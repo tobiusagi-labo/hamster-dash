@@ -34,6 +34,7 @@
 
           <div class="hud-right">
             <button id="sound-btn" class="icon-btn" aria-label="サウンド切替">🔊</button>
+            <button id="menu-btn" class="icon-btn menu-icon-btn" aria-label="メニュー">☰</button>
           </div>
         </div>
 
@@ -243,6 +244,40 @@
           </div>
 
           <button class="primary-btn" id="btn-close-stats">とじる</button>
+        </div>
+      </div>
+
+      <!-- In-Game Pause / Menu Modal -->
+      <div id="pause-modal" class="overlay hidden">
+        <div class="pause-card">
+          <div class="pause-badge">⏸️ PAUSE</div>
+          <h3 class="howto-title pause-title">メニュー</h3>
+
+          <div class="pause-volume-box">
+            <div class="pause-volume-header">
+              <span class="pause-volume-label">🔊 音量調節</span>
+              <span class="pause-volume-val" id="volume-val">80%</span>
+            </div>
+            <div class="pause-volume-controls">
+              <button type="button" class="pause-mute-btn" id="btn-pause-mute" aria-label="ミュート切替">🔊</button>
+              <input
+                type="range"
+                id="volume-slider"
+                class="volume-slider"
+                min="0"
+                max="100"
+                step="1"
+                value="80"
+                aria-label="音量スライダー"
+              />
+            </div>
+          </div>
+
+          <div class="pause-actions">
+            <button type="button" class="primary-btn" id="btn-pause-resume">▶️ ゲームに戻る</button>
+            <button type="button" class="secondary-btn pause-restart-btn" id="btn-pause-restart">🔄 リスタート</button>
+            <button type="button" class="secondary-btn pause-title-btn" id="btn-pause-title">🏠 タイトルに戻る</button>
+          </div>
         </div>
       </div>
 
