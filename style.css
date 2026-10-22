@@ -188,29 +188,43 @@ html, body {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.menu-icon-btn {
-  font-weight: 900;
-  color: #78350f;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border-color: #d97706;
+  justify-content: flex-end;
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 17px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.95);
+  font-size: 19px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   transition: transform 0.1s ease;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+}
+
+.icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+}
+
+.menu-icon-btn {
+  font-size: 21px;
+  font-weight: 900;
+  color: #78350f;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 40%, #fde68a 100%);
+  border: 2.5px solid #ea580c;
+  box-shadow: 0 3px 10px rgba(234, 88, 12, 0.38);
 }
 
 .icon-btn:active {

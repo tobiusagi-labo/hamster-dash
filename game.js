@@ -1954,14 +1954,16 @@
   });
 
   // UI Buttons
-  soundBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    sound.init();
-    sound.toggleMute();
-  });
+  if (soundBtn) {
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.init();
+      sound.toggleMute();
+    });
+  }
 
   function openPauseMenu() {
-    if (state !== 'PLAYING' && state !== 'COUNTDOWN') return;
+    if (state === 'GAMEOVER' || state === 'TITLE' || state === 'MODESELECT') return;
     sound.init();
     sound.playUIClick();
     isPaused = true;
@@ -1974,12 +1976,30 @@
     sound.init();
     sound.playUIClick();
     isPaused = false;
+    lastTime = performance.now();
     if (pauseModal) pauseModal.classList.add('hidden');
   }
 
+  function bindInstantTrigger(el, callback) {
+    if (!el) return;
+    let lastActionTime = 0;
+    const handler = (e) => {
+      const now = Date.now();
+      if (now - lastActionTime < 320) return;
+      lastActionTime = now;
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      callback();
+    };
+    el.addEventListener('pointerdown', handler);
+    el.addEventListener('touchstart', handler, { passive: false });
+    el.addEventListener('click', handler);
+  }
+
   if (menuBtn) {
-    menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    bindInstantTrigger(menuBtn, () => {
       if (isPaused) {
         closePauseMenu();
       } else {
@@ -1996,34 +2016,26 @@
     });
   }
 
-  if (btnPauseResume) {
-    btnPauseResume.addEventListener('click', () => {
-      closePauseMenu();
-    });
-  }
+  bindInstantTrigger(btnPauseResume, () => {
+    closePauseMenu();
+  });
 
-  if (btnPauseRestart) {
-    btnPauseRestart.addEventListener('click', () => {
-      isPaused = false;
-      if (pauseModal) pauseModal.classList.add('hidden');
-      startGame(gameMode);
-    });
-  }
+  bindInstantTrigger(btnPauseRestart, () => {
+    isPaused = false;
+    if (pauseModal) pauseModal.classList.add('hidden');
+    startGame(gameMode);
+  });
 
-  if (btnPauseTitle) {
-    btnPauseTitle.addEventListener('click', () => {
-      isPaused = false;
-      if (pauseModal) pauseModal.classList.add('hidden');
-      goToTitleScreen();
-    });
-  }
+  bindInstantTrigger(btnPauseTitle, () => {
+    isPaused = false;
+    if (pauseModal) pauseModal.classList.add('hidden');
+    goToTitleScreen();
+  });
 
-  if (btnPauseMute) {
-    btnPauseMute.addEventListener('click', () => {
-      sound.init();
-      sound.toggleMute();
-    });
-  }
+  bindInstantTrigger(btnPauseMute, () => {
+    sound.init();
+    sound.toggleMute();
+  });
 
   if (volumeSlider) {
     volumeSlider.addEventListener('input', (e) => {
