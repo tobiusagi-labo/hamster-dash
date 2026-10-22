@@ -1,0 +1,10 @@
+{
+  "name": "ハムダッシュ！ - Hamster Dash",
+  "short_name": "ハムダッシュ",
+  "description": "タップで高速直線移動！障害物をよけて時間内に餌を取り続ける縦画面アクションゲーム",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fef3c7",
+  "theme_color": "#f59e0b"
+}
