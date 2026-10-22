@@ -7,6 +7,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#fef3c7" />
   <title>ハムダッシュ！ - Hamster Dash</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -93,7 +96,7 @@
           <div class="hub-top-header">
             <div class="room-current-badge" id="room-current-badge">🏠 LIVING ROOM</div>
             <h2 class="hub-title">モード選択</h2>
-            <p class="hub-sub" id="hub-sub-text">あそびたいモードをタップ！</p>
+            <p class="hub-sub" id="hub-sub-text">画面タップの位置に高速移動！</p>
           </div>
 
           <!-- Middle Row: Large Left Mode Icon | Compact Front Whole-Body Hamster | Large Right Mode Icon -->
@@ -104,8 +107,12 @@
               <span class="hub-mode-sub">時間回復・耐久</span>
             </button>
 
-            <div class="hub-center-hamster">
+            <div class="hub-center-hamster" id="hub-center-hamster" title="RHYTHMモード時はタップで曲変更">
               <canvas id="hub-hamster-canvas" width="88" height="108"></canvas>
+              <div class="rhythm-track-badge hidden" id="rhythm-track-badge">
+                <span class="rhythm-track-name" id="rhythm-track-name">🎵1: ELECTRO</span>
+                <span class="rhythm-track-bpm" id="rhythm-track-bpm">BPM160 👆曲変更</span>
+              </div>
             </div>
 
             <button class="hub-mode-icon-btn timeattack-theme" id="btn-timeattack">
@@ -136,7 +143,6 @@
             </button>
           </div>
         </div>
-        <div class="outside-tap-hint">枠外をタップでタイトルへ戻る</div>
       </div>
 
       <!-- How-To-Play Modal -->
@@ -144,7 +150,7 @@
         <div class="howto-card">
           <h3 class="howto-title">📖 遊び方</h3>
           <div class="rules-box">
-            <div class="rule-item">👆 <span>画面タップでその場所へ<strong>超高速直線ダッシュ</strong>！（止まる時に少し滑るよ）</span></div>
+            <div class="rule-item">👆 <span>画面タップでその場所へ<strong>超高速直線ダッシュ</strong>！</span></div>
             <div class="rule-item">🌻 <span>エサが消える前に<strong>素早く連続ゲット</strong>してコンボを繋ごう！</span></div>
             <div class="rule-item">🧹 <span><strong>お掃除ロボ</strong>はエサやアイテムも吸引！増える<strong>毛糸玉・おもちゃ</strong>に当たると終了！</span></div>
             <div class="rule-item">⏱️ <span><strong>金色の時計</strong>で周囲がスローに！<strong>紫の毒キノコ</strong>は自分が遅くなるので注意！</span></div>
@@ -153,7 +159,7 @@
           </div>
 
           <div class="food-guide-section">
-            <div class="food-guide-header">🍽️ エサの種類（早く消えるほど高得点！）</div>
+            <div class="food-guide-header">🍽️ エサの種類</div>
             <div class="food-guide-list">
               <div class="food-guide-item">
                 <canvas class="food-guide-canvas" id="guide-food-seed" width="38" height="38"></canvas>
@@ -162,7 +168,7 @@
                     <span class="food-guide-name">ひまわりの種</span>
                     <span class="food-guide-pts">100 pt</span>
                   </div>
-                  <div class="food-guide-desc">よく出る基本のおやつ（サバイバル回復 +1.8秒）</div>
+                  <div class="food-guide-desc">よく出る基本のおやつ</div>
                 </div>
               </div>
 
@@ -173,7 +179,7 @@
                     <span class="food-guide-name">濃厚チーズ</span>
                     <span class="food-guide-pts cheese-pts">250 pt</span>
                   </div>
-                  <div class="food-guide-desc">少しレアなごちそう！（サバイバル回復 +2.7秒）</div>
+                  <div class="food-guide-desc">少しレアなごちそう！</div>
                 </div>
               </div>
 
@@ -184,7 +190,7 @@
                     <span class="food-guide-name">黄金の種</span>
                     <span class="food-guide-pts gold-pts">500 pt</span>
                   </div>
-                  <div class="food-guide-desc">すぐ消える超レアおやつ！（サバイバル回復 +3.8秒）</div>
+                  <div class="food-guide-desc">すぐ消える超レアおやつ！</div>
                 </div>
               </div>
             </div>

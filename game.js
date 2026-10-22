@@ -50,6 +50,165 @@
   const btnRoomToggle = document.getElementById('btn-room-toggle');
   const pillLiving = document.getElementById('pill-living');
   const pillRhythm = document.getElementById('pill-rhythm');
+  const hubCenterHamster = document.getElementById('hub-center-hamster');
+  const rhythmTrackBadge = document.getElementById('rhythm-track-badge');
+  const rhythmTrackNameEl = document.getElementById('rhythm-track-name');
+  const rhythmTrackBpmEl = document.getElementById('rhythm-track-bpm');
+
+  const POP_FONT = '"Mochiy Pop One", "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif';
+
+  // --- 5 Selectable RHYTHM ROOM Tracks (Different Genres, all BPM 160~180) ---
+  const RHYTHM_TRACKS = [
+    {
+      id: 'electro',
+      shortLabel: '🎵1: ELECTRO',
+      fullName: 'ELECTRO CLUB',
+      bpm: 160,
+      accentColor: '#ec4899',
+      leadWave: 'triangle',
+      bassWave: 'triangle',
+      kickStart: 155,
+      hatFreq: 760,
+      bassFreqs: [130.81, 130.81, 164.81, 164.81, 174.61, 174.61, 196.0, 196.0],
+      melodyFreqs: [523.25, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 783.99],
+      beatChords: [
+        [523.25, 659.25, 783.99, 1046.5],
+        [659.25, 783.99, 1046.5, 1318.5],
+        [659.25, 783.99, 987.77, 1567.98],
+        [587.33, 880.0, 1174.66, 1760.0],
+        [523.25, 698.46, 880.0, 1396.91],
+        [523.25, 659.25, 880.0, 1318.5],
+        [587.33, 783.99, 987.77, 1174.66],
+        [659.25, 783.99, 1174.66, 1567.98],
+      ],
+    },
+    {
+      id: 'chiptune',
+      shortLabel: '🕹️2: 8BIT',
+      fullName: '8BIT ARCADE',
+      bpm: 165,
+      accentColor: '#38bdf8',
+      leadWave: 'square',
+      bassWave: 'triangle',
+      kickStart: 140,
+      hatFreq: 1120,
+      bassFreqs: [164.81, 329.63, 130.81, 261.63, 146.83, 293.66, 196.0, 246.94],
+      melodyFreqs: [659.25, 783.99, 987.77, 1318.5, 1174.66, 987.77, 783.99, 880.0],
+      beatChords: [
+        [659.25, 783.99, 987.77, 1318.5],
+        [659.25, 987.77, 1318.5, 1567.98],
+        [523.25, 659.25, 783.99, 1046.5],
+        [523.25, 783.99, 1046.5, 1318.5],
+        [587.33, 739.99, 880.0, 1174.66],
+        [587.33, 880.0, 1174.66, 1479.98],
+        [493.88, 739.99, 987.77, 1479.98],
+        [659.25, 987.77, 1174.66, 1567.98],
+      ],
+    },
+    {
+      id: 'disco',
+      shortLabel: '🎷3: DISCO',
+      fullName: 'FUNKY DISCO',
+      bpm: 170,
+      accentColor: '#f59e0b',
+      leadWave: 'sawtooth',
+      bassWave: 'sawtooth',
+      kickStart: 150,
+      hatFreq: 920,
+      bassFreqs: [146.83, 293.66, 174.61, 196.0, 220.0, 261.63, 196.0, 174.61],
+      melodyFreqs: [587.33, 698.46, 783.99, 880.0, 1046.5, 880.0, 783.99, 698.46],
+      beatChords: [
+        [587.33, 698.46, 880.0, 1046.5],
+        [587.33, 783.99, 1046.5, 1318.5],
+        [698.46, 880.0, 1046.5, 1396.91],
+        [659.25, 783.99, 987.77, 1318.5],
+        [587.33, 698.46, 880.0, 1174.66],
+        [698.46, 880.0, 1174.66, 1396.91],
+        [659.25, 783.99, 1046.5, 1567.98],
+        [587.33, 880.0, 1046.5, 1318.5],
+      ],
+    },
+    {
+      id: 'kawaii',
+      shortLabel: '🍬4: KAWAII',
+      fullName: 'KAWAII FUTURE',
+      bpm: 175,
+      accentColor: '#f472b6',
+      leadWave: 'sine',
+      bassWave: 'triangle',
+      kickStart: 175,
+      hatFreq: 1280,
+      bassFreqs: [174.61, 174.61, 196.0, 196.0, 164.81, 164.81, 220.0, 130.81],
+      melodyFreqs: [698.46, 880.0, 1046.5, 1318.5, 1174.66, 1046.5, 880.0, 1567.98],
+      beatChords: [
+        [698.46, 880.0, 1046.5, 1318.5],
+        [880.0, 1046.5, 1318.5, 1567.98],
+        [587.33, 783.99, 987.77, 1396.91],
+        [659.25, 783.99, 1174.66, 1567.98],
+        [659.25, 783.99, 987.77, 1479.98],
+        [523.25, 783.99, 987.77, 1318.5],
+        [698.46, 880.0, 1046.5, 1567.98],
+        [783.99, 1046.5, 1318.5, 1760.0],
+      ],
+    },
+    {
+      id: 'rave',
+      shortLabel: '🔥5: RAVE',
+      fullName: 'HYPER RAVE',
+      bpm: 180,
+      accentColor: '#a855f7',
+      leadWave: 'sawtooth',
+      bassWave: 'square',
+      kickStart: 190,
+      hatFreq: 860,
+      bassFreqs: [110.0, 220.0, 174.61, 174.61, 130.81, 261.63, 196.0, 164.81],
+      melodyFreqs: [880.0, 659.25, 880.0, 1046.5, 987.77, 783.99, 659.25, 1174.66],
+      beatChords: [
+        [440.0, 659.25, 880.0, 1046.5],
+        [523.25, 659.25, 880.0, 1318.5],
+        [523.25, 698.46, 880.0, 1396.91],
+        [523.25, 698.46, 1046.5, 1567.98],
+        [523.25, 659.25, 783.99, 1046.5],
+        [523.25, 783.99, 1046.5, 1318.5],
+        [493.88, 587.33, 783.99, 1174.66],
+        [659.25, 783.99, 987.77, 1567.98],
+      ],
+    },
+  ];
+
+  // --- Cozy "Suika Game" Style Playful Marimba/Ragtime BGM Data for LIVING ROOM ---
+  const LIVING_BGM_BASS = [
+    // Bar 1 (C -> A7)
+    130.81, 0, 196.0, 0, 220.0, 0, 164.81, 0,
+    // Bar 2 (Dm7 -> G7)
+    146.83, 0, 220.0, 0, 196.0, 0, 146.83, 164.81,
+    // Bar 3 (C -> C7)
+    130.81, 0, 196.0, 0, 130.81, 0, 233.08, 0,
+    // Bar 4 (F -> G7)
+    174.61, 0, 177.6, 0, 196.0, 0, 146.83, 196.0,
+  ];
+
+  const LIVING_BGM_MELODY = [
+    // Bar 1: Bouncy skipping C major motif (E5-G5-C6-A5-G5-E5)
+    659.25, 783.99, 1046.5, 0, 880.0, 783.99, 659.25, 0,
+    // Bar 2: Playful answer (F5-A5-G5-E5-D5)
+    698.46, 880.0, 783.99, 659.25, 587.33, 0, 783.99, 0,
+    // Bar 3: Cheerful climb (E5-G5-A5-C6-D6-C6-A5)
+    659.25, 783.99, 880.0, 1046.5, 1174.66, 1046.5, 880.0, 0,
+    // Bar 4: Cute resolving cadence (A5-G5-F5-B5-C6)
+    880.0, 783.99, 698.46, 987.77, 1046.5, 0, 783.99, 0,
+  ];
+
+  const LIVING_BGM_CHORD_NOTES = [
+    [523.25, 659.25], // C
+    [440.0, 678.0],   // A7
+    [587.33, 698.46], // Dm
+    [493.88, 698.46], // G7
+    [523.25, 659.25], // C
+    [523.25, 622.25], // C7
+    [523.25, 698.46], // F
+    [493.88, 783.99], // G7
+  ];
 
   const resultReasonEl = document.getElementById('result-reason');
   const resultTitleText = document.getElementById('result-title-text');
@@ -337,20 +496,93 @@
     }
 
     /**
-     * Synthesizes an upbeat 8-beat musical groove for RHYTHM ROOM (beatIndex: 0..7)
+     * Synthesizes a cozy, cheerful "Suika Game" style marimba/woodwind/ragtime step for LIVING ROOM
      */
-    playRhythmBeat(beatIndex) {
+    playLivingBgmStep(stepIndex) {
+      if (this.muted || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const s = ((stepIndex % 32) + 32) % 32;
+
+      // 1. Bouncy "Oom-Pah" Tuba / Plucked Acoustic Bass on even steps
+      const bassFreq = LIVING_BGM_BASS[s];
+      if (bassFreq > 0) {
+        const bass = this.ctx.createOscillator();
+        const bGain = this.ctx.createGain();
+        bass.type = 'triangle';
+        bass.frequency.setValueAtTime(bassFreq * 1.03, now);
+        bass.frequency.exponentialRampToValueAtTime(bassFreq, now + 0.02);
+        bGain.gain.setValueAtTime(0.085, now);
+        bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        bass.connect(bGain);
+        bGain.connect(this.ctx.destination);
+        bass.start(now);
+        bass.stop(now + 0.17);
+      }
+
+      // 2. Off-beat Ukulele / Ragtime Piano Chord Strums on steps 2, 6, 10, 14... (or odd steps)
+      if (s % 4 === 2) {
+        const chordIdx = Math.floor(s / 4) % LIVING_BGM_CHORD_NOTES.length;
+        const chordNotes = LIVING_BGM_CHORD_NOTES[chordIdx];
+        chordNotes.forEach((cFreq, idx) => {
+          const cOsc = this.ctx.createOscillator();
+          const cGain = this.ctx.createGain();
+          cOsc.type = 'sine';
+          cOsc.frequency.setValueAtTime(cFreq, now + idx * 0.012);
+          cGain.gain.setValueAtTime(0.038, now + idx * 0.012);
+          cGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.012 + 0.095);
+          cOsc.connect(cGain);
+          cGain.connect(this.ctx.destination);
+          cOsc.start(now + idx * 0.012);
+          cOsc.stop(now + idx * 0.012 + 0.1);
+        });
+      }
+
+      // 3. Playful Staccato Marimba / Woodwind Melody (Suika Game vibe!)
+      const melFreq = LIVING_BGM_MELODY[s];
+      if (melFreq > 0) {
+        // Warm fundamental sine
+        const mel = this.ctx.createOscillator();
+        const mGain = this.ctx.createGain();
+        mel.type = 'sine';
+        mel.frequency.setValueAtTime(melFreq, now);
+        mGain.gain.setValueAtTime(0.09, now);
+        mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
+        mel.connect(mGain);
+        mGain.connect(this.ctx.destination);
+        mel.start(now);
+        mel.stop(now + 0.155);
+
+        // Wooden marimba harmonic overtone (2x / 3x partial with fast decay)
+        const harm = this.ctx.createOscillator();
+        const hGain = this.ctx.createGain();
+        harm.type = 'triangle';
+        harm.frequency.setValueAtTime(melFreq * 2, now);
+        hGain.gain.setValueAtTime(0.035, now);
+        hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        harm.connect(hGain);
+        hGain.connect(this.ctx.destination);
+        harm.start(now);
+        harm.stop(now + 0.065);
+      }
+    }
+
+    /**
+     * Synthesizes an upbeat 8-beat musical groove for RHYTHM ROOM (beatIndex: 0..7)
+     * Uses the currently selected track from RHYTHM_TRACKS (5 genres, BPM 160~180)
+     */
+    playRhythmBeat(beatIndex, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const b = ((beatIndex % 8) + 8) % 8;
+      const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
 
-      // 1. Kick / Bass on even beats (0, 2, 4, 6), Snare / Hi-hat on odd beats (1, 3, 5, 7)
+      // 1. Kick / Bass on even beats (0, 2, 4, 6), Snare / Hi-hat + groove bass on odd beats
       if (b % 2 === 0) {
         const kick = this.ctx.createOscillator();
         const kGain = this.ctx.createGain();
         kick.type = 'sine';
         const isDownbeat = b === 0;
-        kick.frequency.setValueAtTime(isDownbeat ? 155 : 125, now);
+        kick.frequency.setValueAtTime(isDownbeat ? track.kickStart : track.kickStart * 0.82, now);
         kick.frequency.exponentialRampToValueAtTime(38, now + 0.12);
         kGain.gain.setValueAtTime(isDownbeat ? 0.24 : 0.17, now);
         kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
@@ -360,85 +592,85 @@
         kick.stop(now + 0.13);
 
         // Synth bass note
-        const bassFreqs = [130.81, 130.81, 164.81, 164.81, 174.61, 174.61, 196.0, 196.0];
         const bass = this.ctx.createOscillator();
         const bGain = this.ctx.createGain();
-        bass.type = 'triangle';
-        bass.frequency.setValueAtTime(bassFreqs[b], now);
-        bGain.gain.setValueAtTime(0.12, now);
-        bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        bass.type = track.bassWave;
+        bass.frequency.setValueAtTime(track.bassFreqs[b], now);
+        bGain.gain.setValueAtTime(track.bassWave === 'sawtooth' || track.bassWave === 'square' ? 0.075 : 0.12, now);
+        bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
         bass.connect(bGain);
         bGain.connect(this.ctx.destination);
         bass.start(now);
-        bass.stop(now + 0.19);
+        bass.stop(now + 0.18);
       } else {
-        // Snare / hi-hat tick on odd beats
+        // Snare / hi-hat tick on odd beats + off-beat bass for chiptune/disco/rave
         const hat = this.ctx.createOscillator();
         const hGain = this.ctx.createGain();
         hat.type = 'square';
-        hat.frequency.setValueAtTime(b === 7 ? 980 : 740, now);
+        hat.frequency.setValueAtTime(b === 7 ? track.hatFreq * 1.25 : track.hatFreq, now);
         hat.frequency.exponentialRampToValueAtTime(240, now + 0.055);
-        hGain.gain.setValueAtTime(0.07, now);
+        hGain.gain.setValueAtTime(0.065, now);
         hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         hat.connect(hGain);
         hGain.connect(this.ctx.destination);
         hat.start(now);
         hat.stop(now + 0.065);
+
+        if (track.id === 'chiptune' || track.id === 'disco' || track.id === 'rave') {
+          const offBass = this.ctx.createOscillator();
+          const obGain = this.ctx.createGain();
+          offBass.type = track.bassWave;
+          offBass.frequency.setValueAtTime(track.bassFreqs[b], now);
+          obGain.gain.setValueAtTime(0.065, now);
+          obGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+          offBass.connect(obGain);
+          obGain.connect(this.ctx.destination);
+          offBass.start(now);
+          offBass.stop(now + 0.14);
+        }
       }
 
-      // 2. Catchy 8-beat Chiptune Arpeggio Melody
-      const melodyFreqs = [523.25, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 783.99];
+      // 2. Track-Specific 8-Beat Lead Melody
       const lead = this.ctx.createOscillator();
       const lGain = this.ctx.createGain();
-      lead.type = 'triangle';
-      lead.frequency.setValueAtTime(melodyFreqs[b], now);
-      lGain.gain.setValueAtTime(b === 0 ? 0.14 : 0.1, now);
-      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      lead.type = track.leadWave;
+      lead.frequency.setValueAtTime(track.melodyFreqs[b], now);
+      const baseLeadGain = track.leadWave === 'sawtooth' || track.leadWave === 'square' ? 0.075 : 0.12;
+      lGain.gain.setValueAtTime(b === 0 ? baseLeadGain * 1.2 : baseLeadGain, now);
+      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.155);
       lead.connect(lGain);
       lGain.connect(this.ctx.destination);
       lead.start(now);
-      lead.stop(now + 0.17);
+      lead.stop(now + 0.165);
     }
 
     /**
      * Distinct, musical synth-chord stab + octave lead accent when dashing on the beat in RHYTHM ROOM!
-     * Harmonizes directly with the current beat (0..7) so movement feels like playing the music.
+     * Harmonizes directly with the current beat (0..7) and selected track genre!
      */
-    playRhythmDash(beatIndex = 0, isPoisoned = false) {
+    playRhythmDash(beatIndex = 0, isPoisoned = false, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const b = ((beatIndex % 8) + 8) % 8;
+      const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
 
-      // Chord voicings per beat matching the 8-beat club progression (C -> Em -> F -> G7)
-      const beatChords = [
-        [523.25, 659.25, 783.99, 1046.5],  // Beat 0: C5-E5-G5-C6
-        [659.25, 783.99, 1046.5, 1318.5],  // Beat 1: E5-G5-C6-E6
-        [659.25, 783.99, 987.77, 1567.98], // Beat 2: E5-G5-B5-G6
-        [587.33, 880.0, 1174.66, 1760.0],  // Beat 3: D5-A5-D6-A6
-        [523.25, 698.46, 880.0, 1396.91],  // Beat 4: C5-F5-A5-F6
-        [523.25, 659.25, 880.0, 1318.5],   // Beat 5: C5-E5-A5-E6
-        [587.33, 783.99, 987.77, 1174.66], // Beat 6: D5-G5-B5-D6
-        [659.25, 783.99, 1174.66, 1567.98] // Beat 7: E5-G5-D6-G6
-      ];
-
-      const chord = beatChords[b];
+      const chord = track.beatChords[b];
       const pitchMult = isPoisoned ? 0.65 : 1.0;
 
-      // 1. Funky Synth-Brass / Pluck Chord Stab (clear, bright, musical)
+      // 1. Genre-Matched Synth-Brass / Pluck Chord Stab
       chord.forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = idx === 3 ? 'sawtooth' : 'triangle';
+        osc.type = idx === 3 ? track.leadWave : 'triangle';
         const f = freq * pitchMult;
-        // Slight pitch-envelope punch at the attack for crisp dash impact
         osc.frequency.setValueAtTime(f * 0.92, now);
         osc.frequency.exponentialRampToValueAtTime(f, now + 0.025);
-        gain.gain.setValueAtTime(idx === 3 ? 0.14 : 0.11, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        gain.gain.setValueAtTime(idx === 3 ? 0.12 : 0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.23);
+        osc.stop(now + 0.22);
       });
 
       // 2. Crisp Club Clap / Synth Snap on the exact moment of dash
@@ -447,7 +679,7 @@
       snap.type = 'square';
       snap.frequency.setValueAtTime(isPoisoned ? 480 : 1350, now);
       snap.frequency.exponentialRampToValueAtTime(isPoisoned ? 180 : 420, now + 0.065);
-      sGain.gain.setValueAtTime(0.18, now);
+      sGain.gain.setValueAtTime(0.16, now);
       sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
       snap.connect(sGain);
       sGain.connect(this.ctx.destination);
@@ -608,13 +840,25 @@
   let gameMode = 'survival'; // 'survival' | 'timeattack'
   let roomType = 'living'; // 'living' (LIVINGROOM) | 'rhythm' (RHYTHMROOM)
 
-  // 8-Beat Rhythm Room State (160 BPM -> 0.375s per beat, 8 beats = 3.0s per perimeter lap)
+  // 8-Beat Rhythm Room State (5 selectable tracks, BPM 160~180)
   const RHYTHM_BEATS = 8;
-  const RHYTHM_BEAT_INTERVAL = 0.375;
+  let rhythmTrackIndex = 0;
+  let hamsterTapPulseTimer = 0;
+  let previewTimeouts = [];
   let rhythmTimer = 0;
   let currentBeatIndex = 0;
   let rhythmBeatPulse = 0;
   let rhythmTapQueue = [];
+
+  function getRhythmBeatInterval() {
+    const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
+    return 60 / track.bpm;
+  }
+
+  // Living Room Suika-Game-Style BGM Sequencer State
+  const LIVING_BGM_STEP_INTERVAL = 0.22;
+  let livingBgmTimer = 0;
+  let livingBgmStep = 0;
 
   let countdownTimer = 0;
   let lastCountdownBeep = 4;
@@ -1247,9 +1491,30 @@
     });
   }
 
+  function clearTrackPreview() {
+    while (previewTimeouts.length > 0) {
+      clearTimeout(previewTimeouts.pop());
+    }
+  }
+
+  function playRhythmTrackPreview(trackIdx) {
+    clearTrackPreview();
+    const track = RHYTHM_TRACKS[trackIdx] || RHYTHM_TRACKS[0];
+    const beatMs = (60 / track.bpm) * 1000;
+    for (let b = 0; b < 4; b++) {
+      const tid = setTimeout(() => {
+        if (state === 'MODESELECT' && roomType === 'rhythm') {
+          sound.playRhythmBeat(b, trackIdx);
+        }
+      }, Math.round(b * beatMs));
+      previewTimeouts.push(tid);
+    }
+  }
+
   // --- Start / Reset Game ---
   function startGame(mode) {
     sound.init();
+    clearTrackPreview();
     sound.playUIClick();
     gameMode = mode;
     state = 'COUNTDOWN';
@@ -1286,6 +1551,9 @@
     currentBeatIndex = 0;
     rhythmBeatPulse = 0;
     rhythmTapQueue = [];
+
+    livingBgmTimer = 0;
+    livingBgmStep = 0;
 
     if (gameMode === 'survival') {
       maxTime = 16.0;
@@ -1468,7 +1736,7 @@
     player.dashEatCount = 0;
 
     if (roomType === 'rhythm') {
-      sound.playRhythmDash(currentBeatIndex, isPoisoned);
+      sound.playRhythmDash(currentBeatIndex, isPoisoned, rhythmTrackIndex);
     } else {
       sound.playDash(isPoisoned);
     }
@@ -1557,6 +1825,7 @@
     state = 'MODESELECT';
     titleScreen.classList.add('hidden');
     modeSelectScreen.classList.remove('hidden');
+    updateRoomSwitchUI();
     renderStatsModalContent();
   });
 
@@ -1564,6 +1833,7 @@
   modeSelectScreen.addEventListener('click', (e) => {
     if (e.target === modeSelectScreen) {
       sound.init();
+      clearTrackPreview();
       sound.playUIClick();
       state = 'TITLE';
       modeSelectScreen.classList.add('hidden');
@@ -1599,18 +1869,30 @@
   // Room Toggle Button: Switch between LIVINGROOM and RHYTHMROOM
   function updateRoomSwitchUI() {
     if (!hubCard) return;
+    const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
     if (roomType === 'rhythm') {
       hubCard.classList.add('rhythm-room-active');
-      if (roomCurrentBadge) roomCurrentBadge.textContent = '🎵 RHYTHM ROOM';
-      if (hubSubText) hubSubText.textContent = '外周8拍のリズムに合わせて高速移動！';
+      if (roomCurrentBadge) {
+        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName})`;
+      }
+      if (hubSubText) {
+        hubSubText.textContent = '外周8拍のリズムで移動！ハムタップで選曲♪';
+      }
       if (pillLiving) pillLiving.classList.remove('active');
       if (pillRhythm) pillRhythm.classList.add('active');
+      if (rhythmTrackBadge) {
+        rhythmTrackBadge.classList.remove('hidden');
+        rhythmTrackBadge.style.borderColor = track.accentColor;
+      }
+      if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
+      if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆曲変更`;
     } else {
       hubCard.classList.remove('rhythm-room-active');
       if (roomCurrentBadge) roomCurrentBadge.textContent = '🏠 LIVING ROOM';
-      if (hubSubText) hubSubText.textContent = 'あそびたいモードをタップ！';
+      if (hubSubText) hubSubText.textContent = '画面タップの位置に高速移動！';
       if (pillLiving) pillLiving.classList.add('active');
       if (pillRhythm) pillRhythm.classList.remove('active');
+      if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
     }
   }
 
@@ -1619,11 +1901,29 @@
       sound.init();
       roomType = roomType === 'living' ? 'rhythm' : 'living';
       if (roomType === 'rhythm') {
-        sound.playRhythmBeat(0);
+        playRhythmTrackPreview(rhythmTrackIndex);
       } else {
+        clearTrackPreview();
         sound.playUIClick();
       }
       updateRoomSwitchUI();
+    });
+  }
+
+  // Center Hamster Tap in Mode Select: Switch between 5 Rhythm Tracks (BPM 160~180)
+  if (hubCenterHamster) {
+    hubCenterHamster.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.init();
+      if (roomType === 'rhythm') {
+        rhythmTrackIndex = (rhythmTrackIndex + 1) % RHYTHM_TRACKS.length;
+        hamsterTapPulseTimer = 0.36;
+        updateRoomSwitchUI();
+        playRhythmTrackPreview(rhythmTrackIndex);
+      } else {
+        hamsterTapPulseTimer = 0.25;
+        sound.playUIClick();
+      }
     });
   }
 
@@ -1745,6 +2045,10 @@
 
   // --- Update Loop ---
   function update(rawDt) {
+    if (hamsterTapPulseTimer > 0) {
+      hamsterTapPulseTimer = Math.max(0, hamsterTapPulseTimer - rawDt);
+    }
+
     if (screenShake > 0) {
       screenShake = Math.max(0, screenShake - rawDt * 22);
     }
@@ -1802,7 +2106,11 @@
           rhythmTimer = 0;
           currentBeatIndex = 0;
           rhythmBeatPulse = 1.0;
-          sound.playRhythmBeat(0);
+          sound.playRhythmBeat(0, rhythmTrackIndex);
+        } else {
+          livingBgmTimer = 0;
+          livingBgmStep = 0;
+          sound.playLivingBgmStep(0);
         }
       }
       return;
@@ -1886,20 +2194,28 @@
 
     if (state !== 'PLAYING') return;
 
-    // --- 8-Beat Rhythm Clock & Queued Dash Trigger (RHYTHM ROOM) ---
+    // --- 8-Beat Rhythm Clock & Queued Dash Trigger (RHYTHM ROOM) or Suika-Style BGM (LIVING ROOM) ---
     if (roomType === 'rhythm') {
+      const beatInterval = getRhythmBeatInterval();
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
       rhythmTimer += rawDt;
-      while (rhythmTimer >= RHYTHM_BEAT_INTERVAL) {
-        rhythmTimer -= RHYTHM_BEAT_INTERVAL;
+      while (rhythmTimer >= beatInterval) {
+        rhythmTimer -= beatInterval;
         currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
         rhythmBeatPulse = 1.0;
-        sound.playRhythmBeat(currentBeatIndex);
+        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
         if (rhythmTapQueue.length > 0) {
           const nextTap = rhythmTapQueue.shift();
           executeDashTo(nextTap.x, nextTap.y);
         }
+      }
+    } else {
+      livingBgmTimer += rawDt;
+      while (livingBgmTimer >= LIVING_BGM_STEP_INTERVAL) {
+        livingBgmTimer -= LIVING_BGM_STEP_INTERVAL;
+        livingBgmStep = (livingBgmStep + 1) % 32;
+        sound.playLivingBgmStep(livingBgmStep);
       }
     }
 
@@ -2376,7 +2692,8 @@
     ctx.lineWidth = 5;
     ctx.strokeRect(rx, ry, rw, rh);
 
-    const frac = state === 'PLAYING' ? clamp(rhythmTimer / RHYTHM_BEAT_INTERVAL, 0, 1) : 0;
+    const beatInterval = getRhythmBeatInterval();
+    const frac = state === 'PLAYING' ? clamp(rhythmTimer / beatInterval, 0, 1) : 0;
     const currentContinuousBeat = currentBeatIndex + frac;
 
     // 1. Draw glowing comet trail of the orbiting light along the perimeter
@@ -2592,7 +2909,7 @@
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 10px sans-serif';
+      ctx.font = `900 10px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`⏱️ SLOW TIME ${worldSlowTimer.toFixed(1)}s`, width / 2, statusOffsetY + 8.5);
@@ -2614,7 +2931,7 @@
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 10px sans-serif';
+      ctx.font = `900 10px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`☠️ 毒スピード低下 ${playerPoisonTimer.toFixed(1)}s`, width / 2, statusOffsetY + 8.5);
@@ -2636,7 +2953,7 @@
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 10px sans-serif';
+      ctx.font = `900 10px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('⛑️ ヘルメット装着中 (1回)', width / 2, statusOffsetY + 8.5);
@@ -3415,10 +3732,13 @@
     hCtx.save();
     hCtx.translate(cx, cy);
 
-    const bounce = Math.sin(now * 0.006) * 2.2;
-    const tilt = Math.sin(now * 0.003) * 0.06;
+    const tapHop = hamsterTapPulseTimer > 0 ? -Math.sin((hamsterTapPulseTimer / 0.36) * Math.PI) * 10 : 0;
+    const tapScale = hamsterTapPulseTimer > 0 ? 1 + Math.sin((hamsterTapPulseTimer / 0.36) * Math.PI) * 0.14 : 1;
+    const bounce = Math.sin(now * 0.006) * 2.2 + tapHop;
+    const tilt = Math.sin(now * 0.003) * 0.06 + (hamsterTapPulseTimer > 0 ? Math.sin(now * 0.04) * 0.14 : 0);
     hCtx.translate(0, bounce);
     hCtx.rotate(tilt);
+    hCtx.scale(tapScale, tapScale);
 
     // Soft ground shadow
     hCtx.fillStyle = 'rgba(120, 53, 15, 0.18)';
@@ -3539,14 +3859,15 @@
 
     // Cute DJ Headphones, Cool Club Sunglasses & Musical Notes when RHYTHM ROOM is selected!
     if (roomType === 'rhythm') {
-      // 1. DJ Headphones arch & earcups
+      const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
+      // 1. DJ Headphones arch & earcups (tinted with current track accent color!)
       hCtx.strokeStyle = '#7c3aed';
       hCtx.lineWidth = 3.2;
       hCtx.beginPath();
       hCtx.arc(0, -10, 21.5, -Math.PI * 0.88, -Math.PI * 0.12);
       hCtx.stroke();
 
-      hCtx.fillStyle = '#ec4899';
+      hCtx.fillStyle = track.accentColor;
       hCtx.strokeStyle = '#581c87';
       hCtx.lineWidth = 1.6;
       hCtx.beginPath();
@@ -4925,7 +5246,7 @@
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
 
-      ctx.font = '900 92px "Hiragino Maru Gothic ProN", "Arial Black", sans-serif';
+      ctx.font = `900 92px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -4940,7 +5261,7 @@
       ctx.fillStyle = '#f59e0b';
       ctx.fillText(String(num), 0, 0);
 
-      ctx.font = '900 16px "Hiragino Maru Gothic ProN", sans-serif';
+      ctx.font = `900 16px ${POP_FONT}`;
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 5;
       ctx.strokeText('READY...', 0, 62);
@@ -4953,7 +5274,7 @@
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
 
-      ctx.font = '900 64px "Hiragino Maru Gothic ProN", "Arial Black", sans-serif';
+      ctx.font = `900 64px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -5021,7 +5342,7 @@
       const alpha = clamp(ft.life / ft.maxLife, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.font = `900 ${ft.size}px "Hiragino Maru Gothic ProN", sans-serif`;
+      ctx.font = `900 ${ft.size}px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 4;
