@@ -527,8 +527,9 @@ html, body {
 }
 
 #title-hero-canvas {
-  width: 236px;
-  height: 212px;
+  width: 290px;
+  height: 208px;
+  max-width: 92vw;
   filter: drop-shadow(0 10px 20px rgba(180, 83, 9, 0.22));
 }
 

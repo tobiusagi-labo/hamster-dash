@@ -4361,27 +4361,24 @@
     hCtx.rotate(tilt);
     hCtx.scale(tapScale, tapScale);
 
-    // Custom hub standing hamster image override if present
-    if (assets.hasImage('hub_hamster')) {
-      assets.drawImage(hCtx, 'hub_hamster', 0, 0, 72, 88);
-      if (roomType === 'rhythm') {
-        // DJ Accessories overlay
-        const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
-        hCtx.strokeStyle = '#7c3aed';
-        hCtx.lineWidth = 3.2;
-        hCtx.beginPath();
-        hCtx.arc(0, -10, 21.5, -Math.PI * 0.88, -Math.PI * 0.12);
-        hCtx.stroke();
-
-        hCtx.fillStyle = track.accentColor;
-        hCtx.strokeStyle = '#581c87';
-        hCtx.lineWidth = 1.6;
-        hCtx.beginPath();
-        hCtx.ellipse(-20, -10, 4.5, 7.5, -0.1, 0, Math.PI * 2);
-        hCtx.ellipse(20, -10, 4.5, 7.5, 0.1, 0, Math.PI * 2);
-        hCtx.fill();
-        hCtx.stroke();
+    // Custom hub standing hamster image override for LIVING ROOM
+    if (roomType === 'living' && assets.hasImage('hub_hamster')) {
+      const img = assets.getImage('hub_hamster');
+      let dw = 78;
+      let dh = 87;
+      if (img && img.naturalWidth && img.naturalHeight) {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        dh = 88;
+        dw = dh * aspect;
       }
+
+      // Soft ground shadow under martial-arts kung-fu stance
+      hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
+      hCtx.beginPath();
+      hCtx.ellipse(0, 39 - bounce * 0.35, 26, 6.5, 0, 0, Math.PI * 2);
+      hCtx.fill();
+
+      assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
       hCtx.restore();
       return;
     }
@@ -4590,22 +4587,23 @@
    * Cute & Stylish Mascot Illustration for the Title Screen (#title-hero-canvas 240x216)
    */
   function drawCuteTitleMascot(tCtx, now) {
-    const cw = 240;
-    const ch = 216;
+    const cw = titleHeroCanvas ? titleHeroCanvas.width : 320;
+    const ch = titleHeroCanvas ? titleHeroCanvas.height : 230;
     tCtx.clearRect(0, 0, cw, ch);
 
     const cx = cw / 2;
-    const cy = ch / 2 + 4;
+    const cy = ch / 2 + 2;
 
     // Custom title mascot override if present
     if (assets.hasImage('title_mascot')) {
       const img = assets.getImage('title_mascot');
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        let dw = 216;
+        // Scaled up ~30% larger for prominent heroic display
+        let dw = 280;
         let dh = dw / aspect;
-        if (dh > 165) {
-          dh = 165;
+        if (dh > 192) {
+          dh = 192;
           dw = dh * aspect;
         }
 
@@ -4619,7 +4617,7 @@
 
         assets.drawImage(tCtx, 'title_mascot', currentX, cy, dw, dh);
       } else {
-        assets.drawImage(tCtx, 'title_mascot', cx, cy, 180, 180);
+        assets.drawImage(tCtx, 'title_mascot', cx, cy, 240, 240);
       }
       return;
     }
