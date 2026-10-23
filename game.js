@@ -1026,10 +1026,14 @@
       .join('');
   }
 
-  // --- Game Constants & State ---
-  let width = 390;
-  let height = 740;
+  // --- Canonical Virtual Resolution (Guarantees 100% Identical Physics & Ratios Across All Devices) ---
+  const VIRTUAL_WIDTH = 390;
+  const VIRTUAL_HEIGHT = 694; // Standard 9:16 vertical arcade proportion
+  let width = VIRTUAL_WIDTH;
+  let height = VIRTUAL_HEIGHT;
   let dpr = 1;
+  let viewScaleX = 1;
+  let viewScaleY = 1;
   const HUD_TOP_MARGIN = 92;
   const WALL_PADDING = 20;
 
@@ -1051,7 +1055,7 @@
     coord: 0, // position along that side
     reach: 0, // current extension length (px)
     maxReach: 0,
-    width: 44, // thickness of paw
+    width: 50, // thickness of paw
     timer: 0,
     warnDuration: 0.65,
     thrustSpeed: 780,
@@ -1123,7 +1127,7 @@
   const player = {
     x: 195,
     y: 420,
-    radius: 11,
+    radius: 15.5,
     targetX: 195,
     targetY: 420,
     dashStartX: 195,
@@ -1152,31 +1156,26 @@
   let floatingTexts = [];
   let targetRipples = [];
 
-  // --- Resize Canvas ---
+  // --- Resize Canvas with Canonical Virtual Resolution ---
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
-    const newWidth = rect.width || 390;
-    const newHeight = rect.height || 740;
-    const newDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    const newCanvasW = Math.round(newWidth * newDpr);
-    const newCanvasH = Math.round(newHeight * newDpr);
+    const displayW = rect.width || VIRTUAL_WIDTH;
+    const displayH = rect.height || VIRTUAL_HEIGHT;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const newCanvasW = Math.round(displayW * dpr);
+    const newCanvasH = Math.round(displayH * dpr);
 
-    // Prevent buffer wipes if dimensions haven't actually changed
-    if (
-      canvas.width === newCanvasW &&
-      canvas.height === newCanvasH &&
-      Math.abs(width - newWidth) < 0.5 &&
-      Math.abs(height - newHeight) < 0.5
-    ) {
-      return;
+    if (canvas.width !== newCanvasW || canvas.height !== newCanvasH) {
+      canvas.width = newCanvasW;
+      canvas.height = newCanvasH;
     }
 
-    width = newWidth;
-    height = newHeight;
-    dpr = newDpr;
-    canvas.width = newCanvasW;
-    canvas.height = newCanvasH;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    viewScaleX = displayW / VIRTUAL_WIDTH;
+    viewScaleY = displayH / VIRTUAL_HEIGHT;
+    width = VIRTUAL_WIDTH;
+    height = VIRTUAL_HEIGHT;
+
+    ctx.setTransform(dpr * viewScaleX, 0, 0, dpr * viewScaleY, 0, 0);
 
     if (state === 'TITLE' || state === 'MODESELECT') {
       player.x = width / 2;
@@ -1211,7 +1210,7 @@
       baseScore: 100,
       timeBonus: 1.75,
       lifetime: 4.8,
-      radius: 12,
+      radius: 15.5,
     },
     {
       id: 'cheese',
@@ -1220,7 +1219,7 @@
       baseScore: 250,
       timeBonus: 2.7,
       lifetime: 4.1,
-      radius: 13.5,
+      radius: 17,
     },
     {
       id: 'gold',
@@ -1229,7 +1228,7 @@
       baseScore: 500,
       timeBonus: 3.8,
       lifetime: 3.3,
-      radius: 13,
+      radius: 17,
     },
   ];
 
@@ -1319,7 +1318,7 @@
     timerItems.push({
       x: bestX,
       y: bestY,
-      radius: 15,
+      radius: 18.5,
       life: 7.5,
       maxLife: 7.5,
       scale: 0.1,
@@ -1366,7 +1365,7 @@
     poisonItem = {
       x: bestX,
       y: bestY,
-      radius: 14,
+      radius: 17,
       scale: 0.1,
       bobPhase: Math.random() * Math.PI * 2,
       beingSucked: false,
@@ -1410,7 +1409,7 @@
     helmetItem = {
       x: bestX,
       y: bestY,
-      radius: 15,
+      radius: 18.5,
       life: 8.5,
       maxLife: 8.5,
       scale: 0.1,
@@ -1594,9 +1593,9 @@
       baseSpeed,
       vx: Math.cos(angle) * baseSpeed,
       vy: Math.sin(angle) * baseSpeed,
-      radius: 34,
-      hitRadius: 28.5,
-      suctionRadius: 58,
+      radius: 36,
+      hitRadius: 30,
+      suctionRadius: 62,
       rotation: 0,
       suckAnimTimer: 0,
       hitHighlight: false,
@@ -1626,7 +1625,7 @@
 
     const isYarn = Math.random() < 0.55;
     let kind = isYarn ? 'yarn' : 'patrol';
-    let radius = isYarn ? 17 : 18;
+    let radius = isYarn ? 20 : 21;
     let speed = (isYarn ? randRange(145, 180) : randRange(130, 168)) + difficultyLevel * 10;
     let angle = Math.random() * Math.PI * 2;
 
@@ -1972,8 +1971,8 @@
     sound.init();
 
     const rect = canvas.getBoundingClientRect();
-    const rawX = clientX - rect.left;
-    const rawY = clientY - rect.top;
+    const rawX = (clientX - rect.left) / viewScaleX;
+    const rawY = (clientY - rect.top) / viewScaleY;
 
     const tx = clamp(rawX, WALL_PADDING, width - WALL_PADDING);
     const ty = clamp(rawY, HUD_TOP_MARGIN + WALL_PADDING, height - WALL_PADDING);
@@ -4296,7 +4295,7 @@
   }
 
   function drawHamster(x, y, angle, isDashing, alpha = 1) {
-    drawHamsterOnCtx(ctx, x, y, angle, isDashing, alpha, 1, false, false);
+    drawHamsterOnCtx(ctx, x, y, angle, isDashing, alpha, 1.35, false, false);
   }
 
   /**
@@ -6186,8 +6185,8 @@
   }
 
   function render() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
+    ctx.setTransform(dpr * viewScaleX, 0, 0, dpr * viewScaleY, 0, 0);
+    ctx.clearRect(-20, -20, width + 40, height + 40);
 
     ctx.save();
     if (screenShake > 0) {

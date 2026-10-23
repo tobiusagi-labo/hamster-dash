@@ -42,8 +42,11 @@ html, body {
   position: relative;
   width: 100%;
   height: 100%;
-  max-width: 460px;
-  max-height: 900px;
+  aspect-ratio: 9 / 16;
+  max-width: min(100vw, calc(100vh * 9 / 16), 460px);
+  max-width: min(100vw, calc(100dvh * 9 / 16), 460px);
+  max-height: min(100vh, calc(100vw * 16 / 9), 818px);
+  max-height: min(100dvh, calc(100vw * 16 / 9), 818px);
   background: #1e1b18;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 0 0 6px #453526;
@@ -54,16 +57,13 @@ html, body {
 
 @media (max-width: 500px) {
   #game-container {
-    max-width: 100%;
-    max-height: 100%;
     box-shadow: none;
+    border-radius: 0;
   }
 }
 
 @media (min-width: 501px) {
   #game-container {
-    height: min(96vh, 860px);
-    width: calc(min(96vh, 860px) * 9 / 16);
     border-radius: 28px;
   }
 }
