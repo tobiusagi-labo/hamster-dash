@@ -103,21 +103,22 @@ html, body {
   flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 8px;
+  position: relative;
 }
 
 .hud-stat {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  flex-shrink: 1;
   min-width: 0;
 }
 
 .score-box {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   background: linear-gradient(135deg, #fff7ed, #ffedd5);
-  padding: 4px 13px;
+  padding: 4px 12px;
   border-radius: 999px;
   border: 2.5px solid #ea580c;
   box-shadow: 0 3px 8px rgba(234, 88, 12, 0.28);
@@ -125,26 +126,23 @@ html, body {
   flex-shrink: 0;
 }
 
-.score-icon {
-  font-size: 16px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
 #score-val {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 900;
   color: #9a3412;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .hud-center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-shrink: 0;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
 }
 
 #combo-badge {
@@ -212,15 +210,16 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0; /* Menu button and timer are firmly anchored and will never get pushed off-screen */
 }
 
 .timer-box {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   background: linear-gradient(135deg, #fff7ed, #ffedd5);
-  padding: 4px 11px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 2.5px solid #0284c7;
   box-shadow: 0 3px 8px rgba(2, 132, 199, 0.28);
@@ -235,19 +234,14 @@ html, body {
   box-shadow: 0 3px 8px rgba(234, 88, 12, 0.28);
 }
 
-.timer-box .timer-icon {
-  font-size: 15px;
-  line-height: 1;
-}
-
 .timer-box #time-text {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 900;
   color: #0369a1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  min-width: 46px;
-  text-align: right;
+  min-width: 44px;
+  text-align: center;
   line-height: 1.1;
 }
 
@@ -272,12 +266,12 @@ html, body {
 }
 
 .icon-btn {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.95);
-  font-size: 19px;
+  font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -289,6 +283,7 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
   position: relative;
+  flex-shrink: 0;
 }
 
 .icon-btn::after {
