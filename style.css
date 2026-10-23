@@ -679,7 +679,7 @@ html, body {
 }
 
 .hub-center-hamster {
-  flex: 0 0 82px;
+  flex: 0 0 104px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -694,9 +694,9 @@ html, body {
 }
 
 #hub-hamster-canvas {
-  width: 76px;
-  height: 94px;
-  filter: drop-shadow(0 4px 8px rgba(180, 83, 9, 0.22));
+  width: 100px;
+  height: 114px;
+  filter: drop-shadow(0 5px 10px rgba(180, 83, 9, 0.24));
 }
 
 .rhythm-track-badge {
@@ -710,7 +710,7 @@ html, body {
   align-items: center;
   gap: 1px;
   box-shadow: 0 3px 8px rgba(147, 51, 234, 0.35);
-  width: 82px;
+  width: 96px;
   pointer-events: none;
 }
 

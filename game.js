@@ -4371,18 +4371,22 @@
     // Custom hub standing hamster image override for LIVING ROOM
     if (roomType === 'living' && assets.hasImage('hub_hamster')) {
       const img = assets.getImage('hub_hamster');
-      let dw = 78;
-      let dh = 87;
+      let dw = 108;
+      let dh = 100;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 88;
-        dw = dh * aspect;
+        dw = 108;
+        dh = dw / aspect;
+        if (dh > 112) {
+          dh = 112;
+          dw = dh * aspect;
+        }
       }
 
       // Soft ground shadow under martial-arts kung-fu stance
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 39 - bounce * 0.35, 26, 6.5, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 48 - bounce * 0.35, 34, 7.5, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
@@ -4393,28 +4397,32 @@
     // Custom hub standing hamster image override for RHYTHM ROOM
     if (roomType === 'rhythm' && assets.hasImage('hub_hamster_rhythm')) {
       const img = assets.getImage('hub_hamster_rhythm');
-      let dw = 82;
-      let dh = 85;
+      let dw = 104;
+      let dh = 108;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 86;
+        dh = 110;
         dw = dh * aspect;
+        if (dw > 108) {
+          dw = 108;
+          dh = dw / aspect;
+        }
       }
 
       // Soft ground shadow under disco stance
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 39 - bounce * 0.35, 26, 6.5, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 48 - bounce * 0.35, 34, 7.5, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       // Floating musical notes around the disco hamster
       const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
       hCtx.fillStyle = track ? track.accentColor : '#d946ef';
-      hCtx.font = '900 13px sans-serif';
+      hCtx.font = '900 14px sans-serif';
       hCtx.textAlign = 'center';
-      const noteY = Math.sin(now * 0.009) * 3.5;
-      hCtx.fillText('♪', 32, -26 + noteY);
-      hCtx.fillText('♫', -32, -24 - noteY);
+      const noteY = Math.sin(now * 0.009) * 4;
+      hCtx.fillText('♪', 40, -34 + noteY);
+      hCtx.fillText('♫', -40, -32 - noteY);
 
       assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, dw, dh);
       hCtx.restore();
@@ -5141,8 +5149,10 @@
     // 2. Mode Select Hub Center Canvas (Compact Front-Facing Standing Hamster!)
     if (state === 'MODESELECT' && hubHamsterCanvas) {
       const hCtx = hubHamsterCanvas.getContext('2d');
-      hCtx.clearRect(0, 0, 88, 108);
-      drawFrontStandingHamster(hCtx, 44, 56, now);
+      const hw = hubHamsterCanvas.width;
+      const hh = hubHamsterCanvas.height;
+      hCtx.clearRect(0, 0, hw, hh);
+      drawFrontStandingHamster(hCtx, hw / 2, hh / 2 + 1, now);
     }
 
     // 3. Game Over / Clear Result Illustration Canvas
