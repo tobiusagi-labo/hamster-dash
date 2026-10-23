@@ -96,6 +96,9 @@
         const img = new Image();
         img.onload = () => {
           this.images[key] = img;
+          if (key === 'title_mascot' && typeof titleEnterTime !== 'undefined') {
+            titleEnterTime = performance.now();
+          }
         };
         img.onerror = () => {
           this.images[key] = null; // ファイルが無いときは内蔵描画
@@ -1126,6 +1129,7 @@
   let deathCause = 'roomba'; // 'roomba' | 'yarn' | 'patrol' | 'starve' | 'clear'
   let screenShake = 0;
   let crashEffect = null;
+  let titleEnterTime = performance.now();
 
   // Timer Item & Slow-Motion Effect State
   let timerItems = [];
@@ -1886,14 +1890,14 @@
     addFloatingText(impactX, impactY - 18, '💥 CRASH!!', '#dc2626', 20);
   }
 
-  function triggerTimeUpGameOver(reasonText, isClear = false) {
+  function triggerTimeUpGameOver(reasonText, isHappy = false, isClear = false) {
     if (state !== 'PLAYING') return;
     state = 'DYING';
     deathSlowMoTimer = 0.7;
     deathReason = reasonText;
-    deathCause = isClear ? 'clear' : 'starve';
+    deathCause = isHappy ? 'clear' : 'starve';
     resultTitleText.textContent = isClear ? 'CLEAR!!' : 'TIME UP!';
-    if (isClear) {
+    if (isHappy) {
       resultReasonEl.classList.add('clear-badge');
     } else {
       resultReasonEl.classList.remove('clear-badge');
@@ -2085,12 +2089,7 @@
   // Step 2 Mode Select Hub -> Tap outside .hub-card -> Return to Step 1 Title Screen!
   modeSelectScreen.addEventListener('click', (e) => {
     if (e.target === modeSelectScreen) {
-      sound.init();
-      clearTrackPreview();
-      sound.playUIClick();
-      state = 'TITLE';
-      modeSelectScreen.classList.add('hidden');
-      titleScreen.classList.remove('hidden');
+      goToTitleScreen();
     }
   });
 
@@ -2346,6 +2345,7 @@
 
   // Game Over -> Return to Title Screen first!
   function goToTitleScreen() {
+    titleEnterTime = performance.now();
     sound.init();
     clearTrackPreview();
     sound.playUIClick();
@@ -2685,10 +2685,15 @@
       updateHUD();
       if (gameMode === 'timeattack') {
         sound.playTimeUp(true);
-        triggerTimeUpGameOver('🎉 60秒完走！お腹いっぱい大満足！', true);
+        triggerTimeUpGameOver('🎉 60秒完走！お腹いっぱい大満足！', true, true);
       } else {
-        sound.playTimeUp(false);
-        triggerTimeUpGameOver('⏳ 時間切れ！お腹がすいて動けない…', false);
+        const hasEaten = foodsCollected >= 1;
+        sound.playTimeUp(hasEaten);
+        if (hasEaten) {
+          triggerTimeUpGameOver('✨ 時間切れ、おいしかった‼', true, false);
+        } else {
+          triggerTimeUpGameOver('⏳ 時間切れ、お腹がすいて動けない', false, false);
+        }
       }
       return;
     }
@@ -4595,7 +4600,6 @@
     // Custom title mascot override if present
     if (assets.hasImage('title_mascot')) {
       const img = assets.getImage('title_mascot');
-      const bounce = Math.sin(now * 0.0055) * 4.5;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
         let dw = 216;
@@ -4604,9 +4608,18 @@
           dh = 165;
           dw = dh * aspect;
         }
-        assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, dw, dh);
+
+        // Slide in smoothly from right off-screen to center, then stay motionless (不動)
+        const elapsed = Math.max(0, (now - titleEnterTime) / 1000);
+        const slideDuration = 0.65;
+        const startX = cw + dw / 2 + 30; // completely outside right canvas boundary
+        const progress = Math.min(1, elapsed / slideDuration);
+        const ease = 1 - Math.pow(1 - progress, 4); // Quartic ease-out: swift glide with clean friction halt
+        const currentX = startX + (cx - startX) * ease;
+
+        assets.drawImage(tCtx, 'title_mascot', currentX, cy, dw, dh);
       } else {
-        assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, 180, 180);
+        assets.drawImage(tCtx, 'title_mascot', cx, cy, 180, 180);
       }
       return;
     }
@@ -5224,7 +5237,8 @@
       rCtx.fillStyle = '#e11d48';
       rCtx.textAlign = 'center';
       const floatY = Math.sin(now * 0.006) * 3;
-      rCtx.fillText('💗 満腹♪', 48, -22 + floatY);
+      const bubbleText = (deathReason && deathReason.includes('おいしかった')) ? '💗 おいしい♪' : '💗 満腹♪';
+      rCtx.fillText(bubbleText, 48, -22 + floatY);
       rCtx.fillText('✨', -48, -20 - floatY);
 
       rCtx.restore();
@@ -6261,42 +6275,6 @@
       ctx.restore();
     }
 
-    // --- Temporary Red Hitbox Overlay for User Verification ---
-    const hitRect = getCatPawRect();
-    if (hitRect) {
-      ctx.save();
-      // Semi-transparent red fill & vivid border
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.42)';
-      ctx.strokeStyle = '#dc2626';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 3]);
-      ctx.fillRect(hitRect.x, hitRect.y, hitRect.w, hitRect.h);
-      ctx.strokeRect(hitRect.x, hitRect.y, hitRect.w, hitRect.h);
-
-      // Hitbox center label
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#991b1b';
-      ctx.lineWidth = 3;
-      ctx.font = '900 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const lx = hitRect.x + hitRect.w / 2;
-      const ly = hitRect.y + hitRect.h / 2;
-      ctx.strokeText('当たり判定', lx, ly);
-      ctx.fillText('当たり判定', lx, ly);
-
-      // Also render player collision circle in red dashed line
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-      ctx.strokeStyle = '#dc2626';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   function render() {
