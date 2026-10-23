@@ -4573,8 +4573,20 @@
 
     // Custom title mascot override if present
     if (assets.hasImage('title_mascot')) {
+      const img = assets.getImage('title_mascot');
       const bounce = Math.sin(now * 0.0055) * 4.5;
-      assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, 160, 160);
+      if (img && img.naturalWidth && img.naturalHeight) {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        let dw = 216;
+        let dh = dw / aspect;
+        if (dh > 165) {
+          dh = 165;
+          dw = dh * aspect;
+        }
+        assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, dw, dh);
+      } else {
+        assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, 180, 180);
+      }
       return;
     }
 
@@ -6118,6 +6130,7 @@
       ? catPaw.pawType
       : (assets.hasImage('cat_paw') ? 'cat_paw' : null);
 
+    let drewCustomPaw = false;
     if (activePawKey) {
       const img = assets.getImage(activePawKey);
       if (img && img.naturalWidth) {
@@ -6136,12 +6149,6 @@
         const rot = isPaw2 ? 2.9694 : 2.7155;
         const s = isPaw2 ? 0.31 : 0.30; // 100% UNIFORM scale: NEVER stretch or distort aspect ratio!
 
-        // Ground soft shadow beneath the paw
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-        ctx.beginPath();
-        ctx.ellipse(r * 0.5, 6, r * 0.52, armW * 0.42, 0, 0, Math.PI * 2);
-        ctx.fill();
-
         // Translate to reach tip (r, 0), rotate along normal, scale uniformly, draw image
         ctx.translate(r, 0);
         ctx.rotate(rot);
@@ -6150,94 +6157,127 @@
 
         ctx.restore();
         ctx.restore();
-        return;
+        drewCustomPaw = true;
       }
     }
 
-    // Ground soft shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
-    ctx.beginPath();
-    ctx.ellipse(r * 0.5, 6, r * 0.52, armW * 0.42, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (!drewCustomPaw) {
+      // Cat arm body (Cream / Calico white base)
+      const armGrad = ctx.createLinearGradient(0, -armW / 2, 0, armW / 2);
+      armGrad.addColorStop(0, '#fef3c7');
+      armGrad.addColorStop(0.5, '#fffbeb');
+      armGrad.addColorStop(1, '#fed7aa');
+      ctx.fillStyle = armGrad;
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 2.5;
 
-    // Cat arm body (Cream / Calico white base)
-    const armGrad = ctx.createLinearGradient(0, -armW / 2, 0, armW / 2);
-    armGrad.addColorStop(0, '#fef3c7');
-    armGrad.addColorStop(0.5, '#fffbeb');
-    armGrad.addColorStop(1, '#fed7aa');
-    ctx.fillStyle = armGrad;
-    ctx.strokeStyle = '#c2410c';
-    ctx.lineWidth = 2.5;
-
-    ctx.beginPath();
-    ctx.moveTo(0, -armW / 2);
-    ctx.lineTo(r - 14, -armW / 2 + 2);
-    ctx.quadraticCurveTo(r + 6, 0, r - 14, armW / 2 - 2);
-    ctx.lineTo(0, armW / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Cute Tabby Stripes on the arm
-    ctx.fillStyle = '#ea580c';
-    const stripeCount = Math.max(1, Math.floor(r / 36));
-    for (let i = 1; i <= stripeCount; i++) {
-      const sx = i * 32;
-      if (sx < r - 16) {
-        ctx.beginPath();
-        ctx.ellipse(sx, -armW / 4, 3.5, 8, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(sx + 8, armW / 4, 3.5, 8, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    // Fluffy Paw Tip (Puffy cat hand)
-    const tipX = r - 10;
-    ctx.fillStyle = '#fffbeb';
-    ctx.strokeStyle = '#c2410c';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.ellipse(tipX, 0, 16, armW * 0.48, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Cute Pink Paw Pads (肉球)
-    ctx.fillStyle = '#f43f5e';
-    // Main big pad
-    ctx.beginPath();
-    ctx.ellipse(tipX - 2, 0, 8, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 4 Little toe beans
-    const toes = [
-      { dx: 7, dy: -12, r: 3.2 },
-      { dx: 9, dy: -4, r: 3.5 },
-      { dx: 9, dy: 4, r: 3.5 },
-      { dx: 7, dy: 12, r: 3.2 },
-    ];
-    for (const toe of toes) {
       ctx.beginPath();
-      ctx.arc(tipX + toe.dx, toe.dy, toe.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Little cute white claws
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#c2410c';
-    ctx.lineWidth = 1.2;
-    for (const toe of toes) {
-      ctx.beginPath();
-      ctx.moveTo(tipX + toe.dx + toe.r * 0.6, toe.dy);
-      ctx.lineTo(tipX + toe.dx + toe.r * 1.8, toe.dy);
-      ctx.lineTo(tipX + toe.dx + toe.r * 0.6, toe.dy + 1.5);
+      ctx.moveTo(0, -armW / 2);
+      ctx.lineTo(r - 14, -armW / 2 + 2);
+      ctx.quadraticCurveTo(r + 6, 0, r - 14, armW / 2 - 2);
+      ctx.lineTo(0, armW / 2);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+
+      // Cute Tabby Stripes on the arm
+      ctx.fillStyle = '#ea580c';
+      const stripeCount = Math.max(1, Math.floor(r / 36));
+      for (let i = 1; i <= stripeCount; i++) {
+        const sx = i * 32;
+        if (sx < r - 16) {
+          ctx.beginPath();
+          ctx.ellipse(sx, -armW / 4, 3.5, 8, -0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(sx + 8, armW / 4, 3.5, 8, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Fluffy Paw Tip (Puffy cat hand)
+      const tipX = r - 10;
+      ctx.fillStyle = '#fffbeb';
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(tipX, 0, 16, armW * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cute Pink Paw Pads (肉球)
+      ctx.fillStyle = '#f43f5e';
+      // Main big pad
+      ctx.beginPath();
+      ctx.ellipse(tipX - 2, 0, 8, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4 Little toe beans
+      const toes = [
+        { dx: 7, dy: -12, r: 3.2 },
+        { dx: 9, dy: -4, r: 3.5 },
+        { dx: 9, dy: 4, r: 3.5 },
+        { dx: 7, dy: 12, r: 3.2 },
+      ];
+      for (const toe of toes) {
+        ctx.beginPath();
+        ctx.arc(tipX + toe.dx, toe.dy, toe.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Little cute white claws
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 1.2;
+      for (const toe of toes) {
+        ctx.beginPath();
+        ctx.moveTo(tipX + toe.dx + toe.r * 0.6, toe.dy);
+        ctx.lineTo(tipX + toe.dx + toe.r * 1.8, toe.dy);
+        ctx.lineTo(tipX + toe.dx + toe.r * 0.6, toe.dy + 1.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.restore();
     }
 
-    ctx.restore();
+    // --- Temporary Red Hitbox Overlay for User Verification ---
+    const hitRect = getCatPawRect();
+    if (hitRect) {
+      ctx.save();
+      // Semi-transparent red fill & vivid border
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.42)';
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 3]);
+      ctx.fillRect(hitRect.x, hitRect.y, hitRect.w, hitRect.h);
+      ctx.strokeRect(hitRect.x, hitRect.y, hitRect.w, hitRect.h);
+
+      // Hitbox center label
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#991b1b';
+      ctx.lineWidth = 3;
+      ctx.font = '900 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const lx = hitRect.x + hitRect.w / 2;
+      const ly = hitRect.y + hitRect.h / 2;
+      ctx.strokeText('当たり判定', lx, ly);
+      ctx.fillText('当たり判定', lx, ly);
+
+      // Also render player collision circle in red dashed line
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function render() {
