@@ -8,12 +8,13 @@
 
   // --- DOM Elements ---
   const canvas = document.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
   const hud = document.getElementById('hud');
   const scoreValEl = document.getElementById('score-val');
   const comboBadge = document.getElementById('combo-badge');
   const comboCountEl = document.getElementById('combo-count');
   const soundBtn = document.getElementById('sound-btn');
+  const menuBtn = document.getElementById('menu-btn');
   const timeTextEl = document.getElementById('time-text');
   const timerBarFill = document.getElementById('timer-bar-fill');
 
@@ -21,7 +22,15 @@
   const modeSelectScreen = document.getElementById('mode-select-screen');
   const howtoModal = document.getElementById('howto-modal');
   const statsModal = document.getElementById('stats-modal');
+  const pauseModal = document.getElementById('pause-modal');
   const gameoverScreen = document.getElementById('gameover-screen');
+
+  const volumeSlider = document.getElementById('volume-slider');
+  const volumeValEl = document.getElementById('volume-val');
+  const btnPauseMute = document.getElementById('btn-pause-mute');
+  const btnPauseResume = document.getElementById('btn-pause-resume');
+  const btnPauseRestart = document.getElementById('btn-pause-restart');
+  const btnPauseTitle = document.getElementById('btn-pause-title');
 
   const titleHeroCanvas = document.getElementById('title-hero-canvas');
   const hubHamsterCanvas = document.getElementById('hub-hamster-canvas');
@@ -300,7 +309,26 @@
   class SoundManager {
     constructor() {
       this.ctx = null;
+      this.masterGain = null;
+      this.noiseBuffer = null;
       this.muted = false;
+      this.volume = 0.8;
+      try {
+        const savedVol = localStorage.getItem('hamster_dash_volume_v1');
+        if (savedVol !== null) {
+          const parsed = parseFloat(savedVol);
+          if (!Number.isNaN(parsed)) {
+            this.volume = Math.max(0, Math.min(1, parsed));
+          }
+        }
+      } catch {
+        // ignore storage errors
+      }
+      this.syncVolumeUI();
+    }
+
+    get dest() {
+      return this.masterGain || this.ctx.destination;
     }
 
     init() {
@@ -308,6 +336,18 @@
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
           this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = this.muted ? 0 : this.volume;
+          this.masterGain.connect(this.ctx.destination);
+
+          // Pre-build short white-noise buffer for Rimshot / K-Snare percussion
+          const sampleRate = this.ctx.sampleRate;
+          const length = Math.floor(sampleRate * 0.12);
+          this.noiseBuffer = this.ctx.createBuffer(1, length, sampleRate);
+          const data = this.noiseBuffer.getChannelData(0);
+          for (let i = 0; i < length; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
         }
       }
       if (this.ctx && this.ctx.state === 'suspended') {
@@ -315,9 +355,42 @@
       }
     }
 
+    syncVolumeUI() {
+      const pct = Math.round((this.muted ? 0 : this.volume) * 100);
+      const icon = this.muted || pct === 0 ? '🔇' : pct < 45 ? '🔉' : '🔊';
+      if (soundBtn) soundBtn.textContent = icon;
+      if (btnPauseMute) btnPauseMute.textContent = icon;
+      if (volumeSlider) volumeSlider.value = String(pct);
+      if (volumeValEl) volumeValEl.textContent = `${pct}%`;
+    }
+
+    setVolume(val) {
+      this.volume = Math.max(0, Math.min(1, val));
+      if (this.volume > 0 && this.muted) {
+        this.muted = false;
+      } else if (this.volume === 0) {
+        this.muted = true;
+      }
+      if (this.masterGain && this.ctx) {
+        this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
+      }
+      try {
+        localStorage.setItem('hamster_dash_volume_v1', String(this.volume));
+      } catch {
+        // ignore
+      }
+      this.syncVolumeUI();
+    }
+
     toggleMute() {
       this.muted = !this.muted;
-      soundBtn.textContent = this.muted ? '🔇' : '🔊';
+      if (!this.muted && this.volume === 0) {
+        this.volume = 0.8;
+      }
+      if (this.masterGain && this.ctx) {
+        this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
+      }
+      this.syncVolumeUI();
     }
 
     playUIClick() {
@@ -331,7 +404,7 @@
       gain.gain.setValueAtTime(0.16, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + 0.09);
     }
@@ -351,7 +424,7 @@
       gain.gain.setValueAtTime(0.22, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + dur);
     }
@@ -369,7 +442,7 @@
       gain.gain.setValueAtTime(0.18, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + 0.095);
     }
@@ -388,7 +461,7 @@
         gain.gain.setValueAtTime(0.2, now + idx * 0.045);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.12);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.dest);
         osc.start(now + idx * 0.045);
         osc.stop(now + idx * 0.045 + 0.12);
       });
@@ -408,7 +481,7 @@
         gain.gain.setValueAtTime(0.09, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.dest);
         osc.start(now);
         osc.stop(now + 0.48);
       });
@@ -421,7 +494,7 @@
       subGain.gain.setValueAtTime(0.35, now);
       subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
       sub.connect(subGain);
-      subGain.connect(this.ctx.destination);
+      subGain.connect(this.dest);
       sub.start(now);
       sub.stop(now + 0.55);
     }
@@ -439,7 +512,7 @@
         gain.gain.setValueAtTime(0.18, now + idx * 0.055);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.055 + 0.15);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.dest);
         osc.start(now + idx * 0.055);
         osc.stop(now + idx * 0.055 + 0.15);
       });
@@ -458,7 +531,7 @@
       gain1.gain.setValueAtTime(0.24, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
       osc1.connect(gain1);
-      gain1.connect(this.ctx.destination);
+      gain1.connect(this.dest);
       osc1.start(now);
       osc1.stop(now + 0.16);
 
@@ -470,7 +543,7 @@
       gain2.gain.setValueAtTime(0.18, now + 0.03);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
       osc2.connect(gain2);
-      gain2.connect(this.ctx.destination);
+      gain2.connect(this.dest);
       osc2.start(now + 0.03);
       osc2.stop(now + 0.24);
     }
@@ -488,7 +561,7 @@
         gain.gain.setValueAtTime(0.16, now + idx * 0.065);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.065 + 0.1);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.dest);
         osc.start(now + idx * 0.065);
         osc.stop(now + idx * 0.065 + 0.1);
       });
@@ -505,7 +578,7 @@
       gain.gain.setValueAtTime(0.11, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + 0.17);
     }
@@ -521,7 +594,7 @@
       gain.gain.setValueAtTime(0.32, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + 0.68);
 
@@ -533,7 +606,7 @@
       gain2.gain.setValueAtTime(0.2, now);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
       osc2.connect(gain2);
-      gain2.connect(this.ctx.destination);
+      gain2.connect(this.dest);
       osc2.start(now);
       osc2.stop(now + 0.24);
     }
@@ -550,7 +623,7 @@
         gain.gain.setValueAtTime(0.22, now + idx * 0.11);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.11 + 0.2);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.dest);
         osc.start(now + idx * 0.11);
         osc.stop(now + idx * 0.11 + 0.2);
       });
@@ -567,7 +640,7 @@
       gain.gain.setValueAtTime(0.08, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
       osc.stop(now + 0.14);
     }
@@ -591,7 +664,7 @@
         bGain.gain.setValueAtTime(0.085, now);
         bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
         bass.connect(bGain);
-        bGain.connect(this.ctx.destination);
+        bGain.connect(this.dest);
         bass.start(now);
         bass.stop(now + 0.17);
       }
@@ -608,7 +681,7 @@
           cGain.gain.setValueAtTime(0.038, now + idx * 0.012);
           cGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.012 + 0.095);
           cOsc.connect(cGain);
-          cGain.connect(this.ctx.destination);
+          cGain.connect(this.dest);
           cOsc.start(now + idx * 0.012);
           cOsc.stop(now + idx * 0.012 + 0.1);
         });
@@ -625,7 +698,7 @@
         mGain.gain.setValueAtTime(0.09, now);
         mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
         mel.connect(mGain);
-        mGain.connect(this.ctx.destination);
+        mGain.connect(this.dest);
         mel.start(now);
         mel.stop(now + 0.155);
 
@@ -637,7 +710,7 @@
         hGain.gain.setValueAtTime(0.035, now);
         hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         harm.connect(hGain);
-        hGain.connect(this.ctx.destination);
+        hGain.connect(this.dest);
         harm.start(now);
         harm.stop(now + 0.065);
       }
@@ -664,7 +737,7 @@
         kGain.gain.setValueAtTime(isDown ? 0.28 : 0.21, now);
         kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
         kick.connect(kGain);
-        kGain.connect(this.ctx.destination);
+        kGain.connect(this.dest);
         kick.start(now);
         kick.stop(now + 0.14);
 
@@ -677,7 +750,7 @@
         cGain.gain.setValueAtTime(0.12, now);
         cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
         click.connect(cGain);
-        cGain.connect(this.ctx.destination);
+        cGain.connect(this.dest);
         click.start(now);
         click.stop(now + 0.03);
       } else {
@@ -690,7 +763,7 @@
         sGain.gain.setValueAtTime(0.15, now);
         sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
         snare.connect(sGain);
-        sGain.connect(this.ctx.destination);
+        sGain.connect(this.dest);
         snare.start(now);
         snare.stop(now + 0.095);
 
@@ -703,7 +776,7 @@
         hGain.gain.setValueAtTime(0.08, now);
         hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
         hat.connect(hGain);
-        hGain.connect(this.ctx.destination);
+        hGain.connect(this.dest);
         hat.start(now);
         hat.stop(now + 0.075);
       }
@@ -720,7 +793,7 @@
       bGain.gain.setValueAtTime(bVol, now);
       bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
       bass.connect(bGain);
-      bGain.connect(this.ctx.destination);
+      bGain.connect(this.dest);
       bass.start(now);
       bass.stop(now + 0.18);
 
@@ -750,52 +823,66 @@
       lGain.gain.setValueAtTime(b === 0 ? baseLeadGain * 1.25 : baseLeadGain, now);
       lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
       lead.connect(lGain);
-      lGain.connect(this.ctx.destination);
+      lGain.connect(this.dest);
       lead.start(now);
       lead.stop(now + 0.18);
     }
 
     /**
-     * Distinct, musical synth-chord stab + octave lead accent when dashing on the beat in RHYTHM ROOM!
-     * Harmonizes directly with the current beat (0..7) and selected track genre!
+     * Simple, crisp Rimshot / K-Snare percussion when dashing on the beat in RHYTHM ROOM!
+     * Woody rim knock + high-passed tight K-snare snap (no chord stabs that clash with BGM).
      */
     playRhythmDash(beatIndex = 0, isPoisoned = false, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
-      const b = ((beatIndex % 8) + 8) % 8;
-      const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+      const pitchMult = isPoisoned ? 0.68 : 1.0;
 
-      const chord = track.beatChords[b];
-      const pitchMult = isPoisoned ? 0.65 : 1.0;
+      // 1. Rimshot woody shell transient (tight pitch drop)
+      const rimBody = this.ctx.createOscillator();
+      const rbGain = this.ctx.createGain();
+      rimBody.type = 'triangle';
+      rimBody.frequency.setValueAtTime(480 * pitchMult, now);
+      rimBody.frequency.exponentialRampToValueAtTime(175 * pitchMult, now + 0.032);
+      rbGain.gain.setValueAtTime(0.32, now);
+      rbGain.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
+      rimBody.connect(rbGain);
+      rbGain.connect(this.dest);
+      rimBody.start(now);
+      rimBody.stop(now + 0.045);
 
-      // 1. Genre-Matched Synth-Brass / Pluck Chord Stab
-      chord.forEach((freq, idx) => {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = idx === 3 ? track.leadWave : 'triangle';
-        const f = freq * pitchMult;
-        osc.frequency.setValueAtTime(f * 0.92, now);
-        osc.frequency.exponentialRampToValueAtTime(f, now + 0.025);
-        gain.gain.setValueAtTime(idx === 3 ? 0.12 : 0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.22);
-      });
+      // 2. Metallic rim click overtone ("カッ" attack)
+      const rimClick = this.ctx.createOscillator();
+      const rcGain = this.ctx.createGain();
+      rimClick.type = 'sine';
+      rimClick.frequency.setValueAtTime(1760 * pitchMult, now);
+      rimClick.frequency.exponentialRampToValueAtTime(840 * pitchMult, now + 0.018);
+      rcGain.gain.setValueAtTime(0.24, now);
+      rcGain.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
+      rimClick.connect(rcGain);
+      rcGain.connect(this.dest);
+      rimClick.start(now);
+      rimClick.stop(now + 0.025);
 
-      // 2. Crisp Club Clap / Synth Snap on the exact moment of dash
-      const snap = this.ctx.createOscillator();
-      const sGain = this.ctx.createGain();
-      snap.type = 'square';
-      snap.frequency.setValueAtTime(isPoisoned ? 480 : 1350, now);
-      snap.frequency.exponentialRampToValueAtTime(isPoisoned ? 180 : 420, now + 0.065);
-      sGain.gain.setValueAtTime(0.16, now);
-      sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
-      snap.connect(sGain);
-      sGain.connect(this.ctx.destination);
-      snap.start(now);
-      snap.stop(now + 0.075);
+      // 3. K-Snare crisp high-mid noise burst ("ツッ / タッ" snare wire snap)
+      if (this.noiseBuffer) {
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(isPoisoned ? 1200 : 2600, now);
+        filter.Q.setValueAtTime(1.8, now);
+
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.34, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.062);
+
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(this.dest);
+        noise.start(now);
+        noise.stop(now + 0.068);
+      }
     }
 
     playQueueTap(queueIndex = 1) {
@@ -803,16 +890,16 @@
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      const freq = Math.min(1480, 680 + (queueIndex - 1) * 90);
+      osc.type = 'triangle';
+      const freq = Math.min(1300, 820 + (queueIndex - 1) * 55);
       osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.18, now + 0.045);
+      osc.frequency.exponentialRampToValueAtTime(360, now + 0.022);
       gain.gain.setValueAtTime(0.11, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.026);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.dest);
       osc.start(now);
-      osc.stop(now + 0.055);
+      osc.stop(now + 0.03);
     }
   }
 
@@ -948,6 +1035,7 @@
 
   // 'TITLE' | 'MODESELECT' | 'COUNTDOWN' | 'PLAYING' | 'DYING' | 'GAMEOVER'
   let state = 'TITLE';
+  let isPaused = false;
   let gameMode = 'survival'; // 'survival' | 'timeattack'
   let roomType = 'living'; // 'living' (LIVINGROOM) | 'rhythm' (RHYTHMROOM)
 
@@ -1067,11 +1155,27 @@
   // --- Resize Canvas ---
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
-    width = rect.width || 390;
-    height = rect.height || 740;
-    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    const newWidth = rect.width || 390;
+    const newHeight = rect.height || 740;
+    const newDpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const newCanvasW = Math.round(newWidth * newDpr);
+    const newCanvasH = Math.round(newHeight * newDpr);
+
+    // Prevent buffer wipes if dimensions haven't actually changed
+    if (
+      canvas.width === newCanvasW &&
+      canvas.height === newCanvasH &&
+      Math.abs(width - newWidth) < 0.5 &&
+      Math.abs(height - newHeight) < 0.5
+    ) {
+      return;
+    }
+
+    width = newWidth;
+    height = newHeight;
+    dpr = newDpr;
+    canvas.width = newCanvasW;
+    canvas.height = newCanvasH;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (state === 'TITLE' || state === 'MODESELECT') {
@@ -1155,7 +1259,7 @@
       const cy = randRange(minY, maxY);
 
       if (dist(cx, cy, player.x, player.y) < 68) continue;
-      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 80) continue;
+      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 100) continue;
       if (poisonItem && dist(cx, cy, poisonItem.x, poisonItem.y) < 48) continue;
       if (helmetItem && dist(cx, cy, helmetItem.x, helmetItem.y) < 48) continue;
 
@@ -1204,7 +1308,7 @@
       const cx = randRange(minX, maxX);
       const cy = randRange(minY, maxY);
       if (dist(cx, cy, player.x, player.y) < 85) continue;
-      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 85) continue;
+      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 100) continue;
       if (poisonItem && dist(cx, cy, poisonItem.x, poisonItem.y) < 55) continue;
       if (helmetItem && dist(cx, cy, helmetItem.x, helmetItem.y) < 55) continue;
       bestX = cx;
@@ -1242,7 +1346,7 @@
       const cy = randRange(minY, maxY);
       if (dist(cx, cy, player.x, player.y) < 95) continue;
       if (dist(cx, cy, player.targetX, player.targetY) < 75) continue;
-      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 85) continue;
+      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 100) continue;
       if (helmetItem && dist(cx, cy, helmetItem.x, helmetItem.y) < 55) continue;
 
       let tooCloseFood = false;
@@ -1286,7 +1390,7 @@
       const cx = randRange(minX, maxX);
       const cy = randRange(minY, maxY);
       if (dist(cx, cy, player.x, player.y) < 90) continue;
-      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 85) continue;
+      if (vacuum && dist(cx, cy, vacuum.x, vacuum.y) < 100) continue;
       if (poisonItem && dist(cx, cy, poisonItem.x, poisonItem.y) < 55) continue;
 
       let tooCloseFood = false;
@@ -1478,9 +1582,9 @@
       baseSpeed,
       vx: Math.cos(angle) * baseSpeed,
       vy: Math.sin(angle) * baseSpeed,
-      radius: 25,
-      hitRadius: 21,
-      suctionRadius: 44,
+      radius: 34,
+      hitRadius: 28.5,
+      suctionRadius: 58,
       rotation: 0,
       suckAnimTimer: 0,
       hitHighlight: false,
@@ -1561,54 +1665,8 @@
   }
 
   function addDashEffect(x1, y1, x2, y2, isPoisoned = false) {
-    const d = dist(x1, y1, x2, y2);
-    if (d < 5) return;
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    const nx = -Math.sin(angle);
-    const ny = Math.cos(angle);
-
-    dashStreaks.push({
-      x1,
-      y1,
-      x2,
-      y2,
-      width: isPoisoned ? 8 : 14,
-      color: isPoisoned
-        ? 'rgba(168, 85, 247, 0.5)'
-        : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 0.65)'
-        : 'rgba(251, 191, 36, 0.55)',
-      coreColor: isPoisoned
-        ? 'rgba(74, 222, 128, 0.7)'
-        : roomType === 'rhythm'
-        ? 'rgba(34, 211, 238, 0.92)'
-        : 'rgba(255, 255, 255, 0.85)',
-      life: 0.28,
-      maxLife: 0.28,
-    });
-
-    const numWindLines = Math.min(8, Math.max(3, Math.floor(d / 35)));
-    for (let i = 0; i < numWindLines; i++) {
-      const tStart = randRange(0.05, 0.65);
-      const segLen = randRange(28, 70);
-      const offset = (i % 2 === 0 ? 1 : -1) * randRange(8, 19);
-      const sx = x1 + (x2 - x1) * tStart + nx * offset;
-      const sy = y1 + (y2 - y1) * tStart + ny * offset;
-      const ex = sx + Math.cos(angle) * segLen;
-      const ey = sy + Math.sin(angle) * segLen;
-
-      dashStreaks.push({
-        x1: sx,
-        y1: sy,
-        x2: ex,
-        y2: ey,
-        width: randRange(2, 3.5),
-        color: isPoisoned ? 'rgba(192, 132, 252, 0.55)' : 'rgba(255, 255, 255, 0.78)',
-        coreColor: null,
-        life: randRange(0.18, 0.32),
-        maxLife: 0.32,
-      });
-    }
+    // Disabled to completely eliminate strobe lines during dashing
+    return;
   }
 
   function addFloatingText(x, y, text, color = '#b45309', size = 16) {
@@ -1744,6 +1802,8 @@
     modeSelectScreen.classList.add('hidden');
     howtoModal.classList.add('hidden');
     statsModal.classList.add('hidden');
+    if (pauseModal) pauseModal.classList.add('hidden');
+    isPaused = false;
     gameoverScreen.classList.add('hidden');
     hud.classList.remove('hidden');
 
@@ -1880,42 +1940,20 @@
     } else {
       sound.playDash(isPoisoned);
     }
-    addDashEffect(player.x, player.y, tx, ty, isPoisoned);
 
-    targetRipples.push({
-      x: tx,
-      y: ty,
-      radius: 4,
-      maxRadius: 24,
-      alpha: 0.95,
-      color: isPoisoned
-        ? 'rgba(168, 85, 247, 1)'
-        : roomType === 'rhythm'
-        ? 'rgba(236, 72, 153, 1)'
-        : 'rgba(245, 158, 11, 1)',
-    });
-
-    targetRipples.push({
-      x: player.x,
-      y: player.y,
-      radius: 6,
-      maxRadius: 30,
-      alpha: 0.75,
-      color: 'rgba(255, 255, 255, 1)',
-    });
-
+    // Gentle tiny puff of dust without flashing streaks or strobe ripples
     addParticles(
       player.x,
       player.y,
       isPoisoned ? '#c084fc' : roomType === 'rhythm' ? '#f472b6' : '#fde047',
-      8,
-      0.85,
-      !isPoisoned
+      3,
+      0.45,
+      false
     );
   }
 
   function handleTap(clientX, clientY) {
-    if (state !== 'PLAYING') return;
+    if (state !== 'PLAYING' || isPaused) return;
     sound.init();
 
     const rect = canvas.getBoundingClientRect();
@@ -1938,22 +1976,42 @@
 
       rhythmTapQueue.push({ x: tx, y: ty });
       sound.playQueueTap(rhythmTapQueue.length);
-
-      targetRipples.push({
-        x: tx,
-        y: ty,
-        radius: 3,
-        maxRadius: 18,
-        alpha: 0.85,
-        color: 'rgba(56, 189, 248, 0.9)',
-      });
     } else {
       // LIVING ROOM: Immediate high-speed linear dash
       executeDashTo(tx, ty);
     }
   }
 
+  // --- Mobile Touch & Pointer Event Handlers (Zero-Flicker) ---
+  let lastCanvasTouchTime = 0;
+
+  canvas.addEventListener(
+    'touchstart',
+    (e) => {
+      e.preventDefault();
+      if (e.touches && e.touches.length > 0) {
+        lastCanvasTouchTime = Date.now();
+        const t = e.touches[0];
+        handleTap(t.clientX, t.clientY);
+      }
+    },
+    { passive: false }
+  );
+
+  canvas.addEventListener(
+    'touchmove',
+    (e) => {
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+
   canvas.addEventListener('pointerdown', (e) => {
+    // If handled by touchstart, ignore duplicate pointerdown
+    if (e.pointerType === 'touch' || Date.now() - lastCanvasTouchTime < 450) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     handleTap(e.clientX, e.clientY);
   });
@@ -1967,6 +2025,16 @@
     modeSelectScreen.classList.remove('hidden');
     updateRoomSwitchUI();
     renderStatsModalContent();
+    if (roomType === 'living') {
+      livingBgmTimer = 0;
+      livingBgmStep = 0;
+      sound.playLivingBgmStep(0);
+    } else {
+      clearTrackPreview();
+      rhythmTimer = 0;
+      currentBeatIndex = 0;
+      sound.playRhythmBeat(0, rhythmTrackIndex);
+    }
   });
 
   // Step 2 Mode Select Hub -> Tap outside .hub-card -> Return to Step 1 Title Screen!
@@ -1997,11 +2065,101 @@
   });
 
   // UI Buttons
-  soundBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  if (soundBtn) {
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.init();
+      sound.toggleMute();
+    });
+  }
+
+  let pauseOpenedTime = 0;
+
+  function openPauseMenu() {
+    if (state === 'GAMEOVER' || state === 'TITLE' || state === 'MODESELECT') return;
+    sound.init();
+    sound.playUIClick();
+    isPaused = true;
+    pauseOpenedTime = Date.now();
+    sound.syncVolumeUI();
+    if (pauseModal) pauseModal.classList.remove('hidden');
+  }
+
+  function closePauseMenu() {
+    if (!isPaused) return;
+    sound.init();
+    sound.playUIClick();
+    isPaused = false;
+    lastTime = performance.now();
+    if (pauseModal) pauseModal.classList.add('hidden');
+  }
+
+  function bindInstantTrigger(el, callback) {
+    if (!el) return;
+    let lastActionTime = 0;
+    const handler = (e) => {
+      const now = Date.now();
+      if (now - lastActionTime < 320) return;
+      lastActionTime = now;
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      callback();
+    };
+    el.addEventListener('pointerdown', handler);
+    el.addEventListener('touchstart', handler, { passive: false });
+    el.addEventListener('click', handler);
+  }
+
+  if (menuBtn) {
+    bindInstantTrigger(menuBtn, () => {
+      if (isPaused) {
+        closePauseMenu();
+      } else {
+        openPauseMenu();
+      }
+    });
+  }
+
+  if (pauseModal) {
+    pauseModal.addEventListener('click', (e) => {
+      if (e.target === pauseModal) {
+        // Prevent accidental backdrop closing from the same touch that opened the menu
+        if (Date.now() - pauseOpenedTime < 380) return;
+        closePauseMenu();
+      }
+    });
+  }
+
+  bindInstantTrigger(btnPauseResume, () => {
+    closePauseMenu();
+  });
+
+  bindInstantTrigger(btnPauseRestart, () => {
+    isPaused = false;
+    if (pauseModal) pauseModal.classList.add('hidden');
+    startGame(gameMode);
+  });
+
+  bindInstantTrigger(btnPauseTitle, () => {
+    isPaused = false;
+    if (pauseModal) pauseModal.classList.add('hidden');
+    goToTitleScreen();
+  });
+
+  bindInstantTrigger(btnPauseMute, () => {
     sound.init();
     sound.toggleMute();
   });
+
+  if (volumeSlider) {
+    volumeSlider.addEventListener('input', (e) => {
+      sound.init();
+      const val = Number(e.target.value) / 100;
+      sound.setVolume(val);
+    });
+  }
 
   btnSurvival.addEventListener('click', () => startGame('survival'));
   btnTimeattack.addEventListener('click', () => startGame('timeattack'));
@@ -2016,7 +2174,7 @@
         roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName})`;
       }
       if (hubSubText) {
-        hubSubText.textContent = '外周8拍のリズムで移動！ハムタップで選曲♪';
+        hubSubText.textContent = 'リズムに合わせて高速移動‼';
       }
       if (pillLiving) pillLiving.classList.remove('active');
       if (pillRhythm) pillRhythm.classList.add('active');
@@ -2057,11 +2215,16 @@
     btnRoomToggle.addEventListener('click', () => {
       sound.init();
       roomType = roomType === 'living' ? 'rhythm' : 'living';
+      clearTrackPreview();
       if (roomType === 'rhythm') {
-        playRhythmTrackPreview(rhythmTrackIndex);
+        rhythmTimer = 0;
+        currentBeatIndex = 0;
+        sound.playRhythmBeat(0, rhythmTrackIndex);
       } else {
-        clearTrackPreview();
         sound.playUIClick();
+        livingBgmTimer = 0;
+        livingBgmStep = 0;
+        sound.playLivingBgmStep(0);
       }
       updateRoomSwitchUI();
     });
@@ -2077,8 +2240,10 @@
       if (roomType === 'rhythm') {
         rhythmTrackIndex = (rhythmTrackIndex + 1) % RHYTHM_TRACKS.length;
         hamsterTapPulseTimer = 0.36;
+        rhythmTimer = 0;
+        currentBeatIndex = 0;
+        sound.playRhythmBeat(0, rhythmTrackIndex);
         updateRoomSwitchUI();
-        playRhythmTrackPreview(rhythmTrackIndex);
       } else {
         hamsterTapPulseTimer = 0.25;
         livingTapCount++;
@@ -2130,8 +2295,11 @@
   // Game Over -> Return to Title Screen first!
   function goToTitleScreen() {
     sound.init();
+    clearTrackPreview();
     sound.playUIClick();
+    isPaused = false;
     state = 'TITLE';
+    if (pauseModal) pauseModal.classList.add('hidden');
     gameoverScreen.classList.add('hidden');
     modeSelectScreen.classList.add('hidden');
     hud.classList.add('hidden');
@@ -2221,6 +2389,30 @@
     if (hamsterTapPulseTimer > 0) {
       hamsterTapPulseTimer = Math.max(0, hamsterTapPulseTimer - rawDt);
     }
+
+    // Play Living Room Suika-style BGM while in Mode Select (when LIVING ROOM is selected)
+    if (state === 'MODESELECT' && roomType === 'living') {
+      livingBgmTimer += rawDt;
+      while (livingBgmTimer >= LIVING_BGM_STEP_INTERVAL) {
+        livingBgmTimer -= LIVING_BGM_STEP_INTERVAL;
+        livingBgmStep = (livingBgmStep + 1) % 32;
+        sound.playLivingBgmStep(livingBgmStep);
+      }
+    }
+
+    // Play Rhythm Room groove BGM while in Mode Select (when RHYTHM ROOM is selected)
+    if (state === 'MODESELECT' && roomType === 'rhythm') {
+      const beatInterval = getRhythmBeatInterval();
+      rhythmTimer += rawDt;
+      while (rhythmTimer >= beatInterval) {
+        rhythmTimer -= beatInterval;
+        currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+        rhythmBeatPulse = 1.0;
+        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
+      }
+    }
+
+    if (isPaused) return;
 
     if (screenShake > 0) {
       screenShake = Math.max(0, screenShake - rawDt * 22);
@@ -2645,12 +2837,7 @@
         player.x = clamp(player.x, minX, maxX);
         player.y = clamp(player.y, minY, maxY);
 
-        player.afterimages.push({
-          x: player.x,
-          y: player.y,
-          angle: player.angle,
-          alpha: playerPoisonTimer > 0 ? 0.32 : 0.52,
-        });
+        // Afterimages disabled for a completely clean, crisp, flicker-free movement
 
         if (Math.random() < 0.45) {
           particles.push({
@@ -3112,7 +3299,7 @@
     if (roomType === 'rhythm') {
       // Dark Nightclub / DJ Dancefloor Background for RHYTHM ROOM
       ctx.fillStyle = '#090414';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-20, -20, width + 40, height + 40);
 
       // Subtle dark club perspective grid lines
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
@@ -3120,8 +3307,8 @@
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
         ctx.stroke();
       }
 
@@ -3160,15 +3347,15 @@
       // LIVING ROOM: Warm Wooden Floor OR Clean Simple Ice Blue (Ice+)
       const isIce = livingOption === 'ice';
       ctx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-20, -20, width + 40, height + 40);
 
       ctx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
       ctx.lineWidth = 2;
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
         ctx.stroke();
       }
 
@@ -3333,18 +3520,6 @@
         ctx.lineTo(ds.x2, ds.y2);
         ctx.stroke();
       }
-      ctx.restore();
-    }
-
-    if (player.isDashing) {
-      ctx.save();
-      ctx.strokeStyle = playerPoisonTimer > 0 ? 'rgba(168, 85, 247, 0.5)' : 'rgba(245, 158, 11, 0.5)';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(player.x, player.y);
-      ctx.lineTo(player.targetX, player.targetY);
-      ctx.stroke();
       ctx.restore();
     }
 
@@ -3670,9 +3845,9 @@
 
     const suckPulse = 1 - ((now * 0.0022) % 1);
     ctx.strokeStyle = `rgba(148, 163, 184, ${suckPulse * 0.45})`;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(0, 0, vacuum.radius + suckPulse * 16, 0, Math.PI * 2);
+    ctx.arc(0, 0, vacuum.radius + suckPulse * 20, 0, Math.PI * 2);
     ctx.stroke();
 
     if (vacuum.suckAnimTimer > 0) {
@@ -3682,7 +3857,7 @@
 
     ctx.fillStyle = vacuum.hitHighlight ? 'rgba(239, 68, 68, 0.55)' : 'rgba(0, 0, 0, 0.22)';
     ctx.beginPath();
-    ctx.arc(0, 4, vacuum.radius + (vacuum.hitHighlight ? 5 : 2), 0, Math.PI * 2);
+    ctx.arc(0, 4.5, vacuum.radius + (vacuum.hitHighlight ? 6 : 2.5), 0, Math.PI * 2);
     ctx.fill();
 
     const moveAngle = Math.atan2(vacuum.vy, vacuum.vx);
@@ -3695,20 +3870,20 @@
     }
 
     const brushPositions = [
-      { bx: vacuum.radius * 0.55, by: -vacuum.radius * 0.65, dir: 1 },
-      { bx: vacuum.radius * 0.55, by: vacuum.radius * 0.65, dir: -1 },
+      { bx: vacuum.radius * 0.56, by: -vacuum.radius * 0.66, dir: 1 },
+      { bx: vacuum.radius * 0.56, by: vacuum.radius * 0.66, dir: -1 },
     ];
     for (const bp of brushPositions) {
       ctx.save();
       ctx.translate(bp.bx, bp.by);
       ctx.rotate(vacuum.rotation * 2.5 * bp.dir);
       ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.4;
       for (let i = 0; i < 3; i++) {
         const a = (i * Math.PI * 2) / 3;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(a) * 10, Math.sin(a) * 10);
+        ctx.lineTo(Math.cos(a) * 14, Math.sin(a) * 14);
         ctx.stroke();
       }
       ctx.restore();
@@ -3716,34 +3891,34 @@
 
     ctx.fillStyle = '#1e293b';
     ctx.strokeStyle = vacuum.hitHighlight ? '#ef4444' : worldSlowTimer > 0 ? '#a855f7' : '#334155';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
     ctx.arc(0, 0, vacuum.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 4.2;
     ctx.beginPath();
-    ctx.arc(0, 0, vacuum.radius - 1.5, -Math.PI * 0.42, Math.PI * 0.42);
+    ctx.arc(0, 0, vacuum.radius - 1.8, -Math.PI * 0.42, Math.PI * 0.42);
     ctx.stroke();
 
     ctx.fillStyle = '#334155';
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.arc(-2, 0, vacuum.radius * 0.64, 0, Math.PI * 2);
+    ctx.arc(-2.5, 0, vacuum.radius * 0.64, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#0f172a';
     ctx.beginPath();
-    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = vacuum.suckAnimTimer > 0 ? '#38bdf8' : '#ef4444';
     ctx.beginPath();
-    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -5982,6 +6157,9 @@
   }
 
   function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
     ctx.save();
     if (screenShake > 0) {
       const sx = (Math.random() - 0.5) * screenShake;
