@@ -95,6 +95,8 @@
         result_roomba: 'assets/images/result_roomba.png',
         result_yarn: 'assets/images/result_yarn.png',
         result_patrol: 'assets/images/result_patrol.png',
+        result_cat: 'assets/images/result_cat.png',
+        result_starve: 'assets/images/result_starve.png',
       };
 
       for (const [key, src] of Object.entries(imageFiles)) {
@@ -5385,6 +5387,7 @@
 
       rCtx.restore();
     } else if (deathCause === 'cat') {
+      if (drawResultImg('result_cat', 134, 108, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy);
 
@@ -5479,6 +5482,7 @@
 
       rCtx.restore();
     } else {
+      if (drawResultImg('result_starve', 124, 108, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy + 8);
 
