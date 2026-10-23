@@ -1054,6 +1054,23 @@
   let livingTapCount = 0;
 
   // Cat Paw Hazard State (Cat+)
+  const CAT_PAW_CONFIGS = {
+    cat_paw_1: {
+      tipX: 266,
+      tipY: 240,
+      rot: 2.7539,
+      scale: 0.28,
+      width: 72,
+    },
+    cat_paw_2: {
+      tipX: 56,
+      tipY: 253,
+      rot: 2.9170,
+      scale: 0.28,
+      width: 66,
+    },
+  };
+
   const catPaw = {
     active: false,
     state: 'idle', // 'idle' | 'warn' | 'thrust' | 'hold' | 'retract'
@@ -1062,7 +1079,7 @@
     coord: 0, // position along that side
     reach: 0, // current extension length (px)
     maxReach: 0,
-    width: 60, // thickness of paw
+    width: 70, // thickness of paw
     timer: 0,
     warnDuration: 0.65,
     thrustSpeed: 780,
@@ -3096,6 +3113,10 @@
         catPaw.state = 'warn';
         catPaw.timer = 0;
         catPaw.pawType = Math.random() < 0.5 ? 'cat_paw_1' : 'cat_paw_2';
+        const pawConf = CAT_PAW_CONFIGS[catPaw.pawType];
+        if (pawConf) {
+          catPaw.width = pawConf.width;
+        }
         const sides = ['top', 'bottom', 'left', 'right'];
         catPaw.side = sides[Math.floor(Math.random() * sides.length)];
 
@@ -6140,14 +6161,12 @@
         ctx.rect(0, -height, width * 2, height * 2);
         ctx.clip();
 
-        // Exact tip & base alignment parameters for natural perpendicular extension without stretching
-        // Paw 1: Grey cat paw with pink pads (natural tilt 24.4°, rotated so arm vector is 100% perpendicular)
-        // Paw 2: Tabby cat paw with dark pads (natural tilt 9.9°, rotated so arm vector is 100% perpendicular)
-        const isPaw2 = activePawKey === 'cat_paw_2';
-        const tipX = isPaw2 ? 53 : 77;
-        const tipY = isPaw2 ? 264 : 1;
-        const rot = isPaw2 ? 2.9694 : 2.7155;
-        const s = isPaw2 ? 0.31 : 0.30; // 100% UNIFORM scale: NEVER stretch or distort aspect ratio!
+        // Precise tip & angle calibration to achieve 100% exact alignment with the collision hitbox
+        const conf = CAT_PAW_CONFIGS[activePawKey] || CAT_PAW_CONFIGS.cat_paw_1;
+        const tipX = conf.tipX;
+        const tipY = conf.tipY;
+        const rot = conf.rot;
+        const s = conf.scale; // 100% UNIFORM scale: maintains natural aspect ratio
 
         // Translate to reach tip (r, 0), rotate along normal, scale uniformly, draw image
         ctx.translate(r, 0);
