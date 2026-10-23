@@ -90,6 +90,7 @@
         cat_paw_2: 'assets/images/cat_paw_2.png',
         title_mascot: 'assets/images/title_mascot.png',
         hub_hamster: 'assets/images/hub_hamster.png',
+        hub_hamster_rhythm: 'assets/images/hub_hamster_rhythm.png',
       };
 
       for (const [key, src] of Object.entries(imageFiles)) {
@@ -4379,6 +4380,37 @@
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
+      hCtx.restore();
+      return;
+    }
+
+    // Custom hub standing hamster image override for RHYTHM ROOM
+    if (roomType === 'rhythm' && assets.hasImage('hub_hamster_rhythm')) {
+      const img = assets.getImage('hub_hamster_rhythm');
+      let dw = 82;
+      let dh = 85;
+      if (img && img.naturalWidth && img.naturalHeight) {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        dh = 86;
+        dw = dh * aspect;
+      }
+
+      // Soft ground shadow under disco stance
+      hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
+      hCtx.beginPath();
+      hCtx.ellipse(0, 39 - bounce * 0.35, 26, 6.5, 0, 0, Math.PI * 2);
+      hCtx.fill();
+
+      // Floating musical notes around the disco hamster
+      const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
+      hCtx.fillStyle = track ? track.accentColor : '#d946ef';
+      hCtx.font = '900 13px sans-serif';
+      hCtx.textAlign = 'center';
+      const noteY = Math.sin(now * 0.009) * 3.5;
+      hCtx.fillText('♪', 32, -26 + noteY);
+      hCtx.fillText('♫', -32, -24 - noteY);
+
+      assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, dw, dh);
       hCtx.restore();
       return;
     }
