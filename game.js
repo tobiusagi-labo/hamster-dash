@@ -86,6 +86,8 @@
         vacuum: 'assets/images/vacuum.png',
         yarn: 'assets/images/yarn.png',
         cat_paw: 'assets/images/cat_paw.png',
+        cat_paw_1: 'assets/images/cat_paw_1.png',
+        cat_paw_2: 'assets/images/cat_paw_2.png',
         title_mascot: 'assets/images/title_mascot.png',
         hub_hamster: 'assets/images/hub_hamster.png',
       };
@@ -127,6 +129,10 @@
 
     hasImage(key) {
       return !!this.images[key];
+    }
+
+    getImage(key) {
+      return this.images[key] || null;
     }
 
     drawImage(tCtx, key, x, y, w, h, angle = 0) {
@@ -985,8 +991,8 @@
 
   function renderStatsModalContent() {
     const stats = getLifetimeStats();
-    bestSurvivalEl.textContent = getBestScore('survival').toLocaleString();
-    bestTimeattackEl.textContent = getBestScore('timeattack').toLocaleString();
+    bestSurvivalEl.textContent = `${getBestScore('survival').toLocaleString()}点`;
+    bestTimeattackEl.textContent = `${getBestScore('timeattack').toLocaleString()}点`;
 
     totalFoodsValEl.textContent = `${stats.totalFoods.toLocaleString()}個`;
     longestTimeValEl.textContent = `${stats.longestTime.toFixed(1)}s`;
@@ -1018,7 +1024,7 @@
             </div>
             <div class="history-right">
               <span class="history-meta">🌻${item.foods} / ${item.combo}連 / ${item.time}s</span>
-              <span class="history-score">${Number(item.score).toLocaleString()} pt</span>
+              <span class="history-score">${Number(item.score).toLocaleString()}点</span>
             </div>
           </div>
         `;
@@ -1052,6 +1058,7 @@
     active: false,
     state: 'idle', // 'idle' | 'warn' | 'thrust' | 'hold' | 'retract'
     side: 'left', // 'top' | 'bottom' | 'left' | 'right'
+    pawType: 'cat_paw_1',
     coord: 0, // position along that side
     reach: 0, // current extension length (px)
     maxReach: 0,
@@ -1893,7 +1900,7 @@
     recordGameStats(gameMode, score, foodsCollected, maxCombo, elapsedTime, deathCause);
 
     resultReasonEl.textContent = deathReason;
-    finalScoreEl.textContent = score.toLocaleString();
+    finalScoreEl.textContent = `${score.toLocaleString()}点`;
     if (isNewRecord) {
       newRecordBadge.classList.remove('hidden');
     } else {
@@ -1903,7 +1910,7 @@
     statFoodsEl.textContent = `${foodsCollected}個`;
     statMaxComboEl.textContent = `${maxCombo} COMBO`;
     statTimeEl.textContent = `${elapsedTime.toFixed(1)}s`;
-    statBestEl.textContent = bestScore.toLocaleString();
+    statBestEl.textContent = `${bestScore.toLocaleString()}点`;
     renderStatsModalContent();
   }
 
@@ -2363,12 +2370,12 @@
       addFloatingText(
         food.x,
         food.y - 14,
-        `+${gainedScore.toLocaleString()} (+${addedTime.toFixed(1)}s)`,
+        `+${gainedScore.toLocaleString()}点 (+${addedTime.toFixed(1)}s)`,
         '#15803d',
         14
       );
     } else {
-      addFloatingText(food.x, food.y - 14, `+${gainedScore.toLocaleString()}`, '#b45309', 15);
+      addFloatingText(food.x, food.y - 14, `+${gainedScore.toLocaleString()}点`, '#b45309', 15);
     }
 
     if (player.dashEatCount >= 2) {
@@ -3088,6 +3095,7 @@
       if (catPaw.nextSpawnTimer <= 0) {
         catPaw.state = 'warn';
         catPaw.timer = 0;
+        catPaw.pawType = Math.random() < 0.5 ? 'cat_paw_1' : 'cat_paw_2';
         const sides = ['top', 'bottom', 'left', 'right'];
         catPaw.side = sides[Math.floor(Math.random() * sides.length)];
 
@@ -6105,11 +6113,40 @@
     const r = catPaw.reach;
     const armW = catPaw.width;
 
-    // Custom cat paw image override if present
-    if (assets.hasImage('cat_paw')) {
-      assets.drawImage(ctx, 'cat_paw', r - armW * 0.6, 0, armW * 1.4, armW * 1.4);
-      ctx.restore();
-      return;
+    // Custom cat paw images (randomized between cat_paw_1 & cat_paw_2)
+    const activePawKey = (catPaw.pawType && assets.hasImage(catPaw.pawType))
+      ? catPaw.pawType
+      : (assets.hasImage('cat_paw') ? 'cat_paw' : null);
+
+    if (activePawKey) {
+      const img = assets.getImage(activePawKey);
+      if (img && img.naturalWidth) {
+        ctx.save();
+        // Clip to the visible area coming out of the wall (x >= 0)
+        ctx.beginPath();
+        ctx.rect(0, -armW * 2.5, r + 25, armW * 5);
+        ctx.clip();
+
+        const drawH = armW * 1.85;
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const drawW = Math.max(r + 40, drawH * aspect);
+
+        // Ground soft shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.beginPath();
+        ctx.ellipse(r * 0.5, 8, r * 0.52, armW * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // The image has the paw on the left (x=0) and arm on the right (x=drawW).
+        // By translating to r and scaling X by -1, the paw is at r and arm extends back towards 0!
+        ctx.translate(r, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, -drawH / 2, drawW, drawH);
+
+        ctx.restore();
+        ctx.restore();
+        return;
+      }
     }
 
     // Ground soft shadow

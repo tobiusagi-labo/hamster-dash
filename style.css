@@ -136,6 +136,18 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+.score-unit {
+  font-size: 13px;
+  font-weight: 900;
+  color: #9a3412;
+  margin-left: 2px;
+  line-height: 1;
+}
+
+#hud.mode-timeattack .score-unit {
+  color: #1e3a8a;
+}
+
 .hud-center {
   position: absolute;
   left: 50%;
