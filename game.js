@@ -91,6 +91,10 @@
         title_mascot: 'assets/images/title_mascot.png',
         hub_hamster: 'assets/images/hub_hamster.png',
         hub_hamster_rhythm: 'assets/images/hub_hamster_rhythm.png',
+        result_clear: 'assets/images/result_clear.png',
+        result_roomba: 'assets/images/result_roomba.png',
+        result_yarn: 'assets/images/result_yarn.png',
+        result_patrol: 'assets/images/result_patrol.png',
       };
 
       for (const [key, src] of Object.entries(imageFiles)) {
@@ -5156,7 +5160,27 @@
     const cx = cw / 2;
     const cy = ch / 2 + 4;
 
-    if (deathCause === 'clear') {
+      function drawResultImg(key, maxW, maxH, extraY = 0) {
+    if (assets.hasImage(key)) {
+      const img = assets.getImage(key);
+      if (img && img.naturalWidth && img.naturalHeight) {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        let dw = maxW;
+        let dh = dw / aspect;
+        if (dh > maxH) {
+          dh = maxH;
+          dw = dh * aspect;
+        }
+        const floatY = Math.sin(now * 0.005) * 2.5;
+        assets.drawImage(rCtx, key, cx, cy + extraY + floatY, dw, dh);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if (deathCause === 'clear') {
+      if (drawResultImg('result_clear', 134, 108, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy);
 
@@ -5273,6 +5297,7 @@
 
       rCtx.restore();
     } else if (deathCause === 'roomba') {
+      if (drawResultImg('result_roomba', 188, 108, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy);
 
@@ -5317,6 +5342,7 @@
 
       rCtx.restore();
     } else if (deathCause === 'yarn') {
+      if (drawResultImg('result_yarn', 136, 106, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy);
 
@@ -5415,6 +5441,7 @@
 
       rCtx.restore();
     } else if (deathCause === 'patrol') {
+      if (drawResultImg('result_patrol', 192, 106, 0)) return;
       rCtx.save();
       rCtx.translate(cx, cy);
 
