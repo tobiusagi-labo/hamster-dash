@@ -54,8 +54,85 @@
   const rhythmTrackBadge = document.getElementById('rhythm-track-badge');
   const rhythmTrackNameEl = document.getElementById('rhythm-track-name');
   const rhythmTrackBpmEl = document.getElementById('rhythm-track-bpm');
+  const livingOptionBadge = document.getElementById('living-option-badge');
+  const livingOptionTextEl = document.getElementById('living-option-text');
 
   const POP_FONT = '"Mochiy Pop One", "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif';
+
+  // --- Asset Manager (Custom Image / Sound Loader with Built-in Fallbacks) ---
+  class AssetManager {
+    constructor() {
+      this.images = {};
+      this.sounds = {};
+      this.initImageLoaders();
+      this.initSoundLoaders();
+    }
+
+    initImageLoaders() {
+      const imageFiles = {
+        player: 'assets/images/player.png',
+        seed: 'assets/images/seed.png',
+        cheese: 'assets/images/cheese.png',
+        gold: 'assets/images/gold.png',
+        vacuum: 'assets/images/vacuum.png',
+        yarn: 'assets/images/yarn.png',
+        cat_paw: 'assets/images/cat_paw.png',
+        title_mascot: 'assets/images/title_mascot.png',
+        hub_hamster: 'assets/images/hub_hamster.png',
+      };
+
+      for (const [key, src] of Object.entries(imageFiles)) {
+        const img = new Image();
+        img.onload = () => {
+          this.images[key] = img;
+        };
+        img.onerror = () => {
+          this.images[key] = null; // ファイルが無いときは内蔵描画
+        };
+        img.src = src;
+      }
+    }
+
+    initSoundLoaders() {
+      const soundFiles = {
+        living_bgm: 'assets/sounds/living_bgm.mp3',
+        rhythm_1: 'assets/sounds/rhythm_1.mp3',
+        rhythm_2: 'assets/sounds/rhythm_2.mp3',
+        rhythm_3: 'assets/sounds/rhythm_3.mp3',
+        rhythm_4: 'assets/sounds/rhythm_4.mp3',
+        rhythm_5: 'assets/sounds/rhythm_5.mp3',
+      };
+
+      for (const [key, src] of Object.entries(soundFiles)) {
+        const aud = new Audio();
+        aud.preload = 'auto';
+        aud.oncanplaythrough = () => {
+          this.sounds[key] = aud;
+        };
+        aud.onerror = () => {
+          this.sounds[key] = null; // ファイルが無いときは内蔵シンセサイザー
+        };
+        aud.src = src;
+      }
+    }
+
+    hasImage(key) {
+      return !!this.images[key];
+    }
+
+    drawImage(tCtx, key, x, y, w, h, angle = 0) {
+      const img = this.images[key];
+      if (!img) return false;
+      tCtx.save();
+      tCtx.translate(x, y);
+      if (angle !== 0) tCtx.rotate(angle);
+      tCtx.drawImage(img, -w / 2, -h / 2, w, h);
+      tCtx.restore();
+      return true;
+    }
+  }
+
+  const assets = new AssetManager();
 
   // --- 5 Selectable RHYTHM ROOM Tracks (Different Genres, all BPM 160~180) ---
   const RHYTHM_TRACKS = [
@@ -568,7 +645,7 @@
 
     /**
      * Synthesizes an upbeat 8-beat musical groove for RHYTHM ROOM (beatIndex: 0..7)
-     * Uses the currently selected track from RHYTHM_TRACKS (5 genres, BPM 160~180)
+     * Richer layered drums, bass groove, chords, and lead melodies
      */
     playRhythmBeat(beatIndex, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
@@ -576,72 +653,106 @@
       const b = ((beatIndex % 8) + 8) % 8;
       const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
 
-      // 1. Kick / Bass on even beats (0, 2, 4, 6), Snare / Hi-hat + groove bass on odd beats
+      // 1. Kick on beats 0, 2, 4, 6 (Four on the Floor punch)
       if (b % 2 === 0) {
         const kick = this.ctx.createOscillator();
         const kGain = this.ctx.createGain();
         kick.type = 'sine';
-        const isDownbeat = b === 0;
-        kick.frequency.setValueAtTime(isDownbeat ? track.kickStart : track.kickStart * 0.82, now);
-        kick.frequency.exponentialRampToValueAtTime(38, now + 0.12);
-        kGain.gain.setValueAtTime(isDownbeat ? 0.24 : 0.17, now);
-        kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+        const isDown = b === 0;
+        kick.frequency.setValueAtTime(isDown ? 165 : 135, now);
+        kick.frequency.exponentialRampToValueAtTime(32, now + 0.13);
+        kGain.gain.setValueAtTime(isDown ? 0.28 : 0.21, now);
+        kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
         kick.connect(kGain);
         kGain.connect(this.ctx.destination);
         kick.start(now);
-        kick.stop(now + 0.13);
+        kick.stop(now + 0.14);
 
-        // Synth bass note
-        const bass = this.ctx.createOscillator();
-        const bGain = this.ctx.createGain();
-        bass.type = track.bassWave;
-        bass.frequency.setValueAtTime(track.bassFreqs[b], now);
-        bGain.gain.setValueAtTime(track.bassWave === 'sawtooth' || track.bassWave === 'square' ? 0.075 : 0.12, now);
-        bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
-        bass.connect(bGain);
-        bGain.connect(this.ctx.destination);
-        bass.start(now);
-        bass.stop(now + 0.18);
+        // Click transient for punchy modern club kick
+        const click = this.ctx.createOscillator();
+        const cGain = this.ctx.createGain();
+        click.type = 'triangle';
+        click.frequency.setValueAtTime(800, now);
+        click.frequency.exponentialRampToValueAtTime(80, now + 0.025);
+        cGain.gain.setValueAtTime(0.12, now);
+        cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        click.connect(cGain);
+        cGain.connect(this.ctx.destination);
+        click.start(now);
+        click.stop(now + 0.03);
       } else {
-        // Snare / hi-hat tick on odd beats + off-beat bass for chiptune/disco/rave
+        // Snare / Clap on odd beats (1, 3, 5, 7)
+        const snare = this.ctx.createOscillator();
+        const sGain = this.ctx.createGain();
+        snare.type = 'triangle';
+        snare.frequency.setValueAtTime(220, now);
+        snare.frequency.exponentialRampToValueAtTime(65, now + 0.09);
+        sGain.gain.setValueAtTime(0.15, now);
+        sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+        snare.connect(sGain);
+        sGain.connect(this.ctx.destination);
+        snare.start(now);
+        snare.stop(now + 0.095);
+
+        // Sizzling Clap Noise burst
         const hat = this.ctx.createOscillator();
         const hGain = this.ctx.createGain();
         hat.type = 'square';
-        hat.frequency.setValueAtTime(b === 7 ? track.hatFreq * 1.25 : track.hatFreq, now);
-        hat.frequency.exponentialRampToValueAtTime(240, now + 0.055);
-        hGain.gain.setValueAtTime(0.065, now);
-        hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        hat.frequency.setValueAtTime(track.hatFreq, now);
+        hat.frequency.exponentialRampToValueAtTime(260, now + 0.07);
+        hGain.gain.setValueAtTime(0.08, now);
+        hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
         hat.connect(hGain);
         hGain.connect(this.ctx.destination);
         hat.start(now);
-        hat.stop(now + 0.065);
-
-        if (track.id === 'chiptune' || track.id === 'disco' || track.id === 'rave') {
-          const offBass = this.ctx.createOscillator();
-          const obGain = this.ctx.createGain();
-          offBass.type = track.bassWave;
-          offBass.frequency.setValueAtTime(track.bassFreqs[b], now);
-          obGain.gain.setValueAtTime(0.065, now);
-          obGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-          offBass.connect(obGain);
-          obGain.connect(this.ctx.destination);
-          offBass.start(now);
-          offBass.stop(now + 0.14);
-        }
+        hat.stop(now + 0.075);
       }
 
-      // 2. Track-Specific 8-Beat Lead Melody
+      // 2. Driving Bassline (Groovy pulse on every beat)
+      const bass = this.ctx.createOscillator();
+      const bGain = this.ctx.createGain();
+      bass.type = track.bassWave;
+      const bFreq = track.bassFreqs[b];
+      bass.frequency.setValueAtTime(bFreq, now);
+      // Slight pitch envelope for funky punch
+      bass.frequency.exponentialRampToValueAtTime(bFreq * 0.98, now + 0.08);
+      const bVol = (track.bassWave === 'sawtooth' || track.bassWave === 'square') ? 0.09 : 0.15;
+      bGain.gain.setValueAtTime(bVol, now);
+      bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      bass.connect(bGain);
+      bGain.connect(this.ctx.destination);
+      bass.start(now);
+      bass.stop(now + 0.18);
+
+      // 3. Ambient Chord Pad Harmony (Gives depth and emotion)
+      const chord = track.beatChords[b];
+      if (chord && chord.length >= 2) {
+        [chord[0], chord[1]].forEach((cFreq, idx) => {
+          const pad = this.ctx.createOscillator();
+          const pGain = this.ctx.createGain();
+          pad.type = 'sine';
+          pad.frequency.setValueAtTime(cFreq, now);
+          pGain.gain.setValueAtTime(0.042, now);
+          pGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          pad.connect(pGain);
+          pGain.connect(this.ctx.destination);
+          pad.start(now);
+          pad.stop(now + 0.23);
+        });
+      }
+
+      // 4. Catchy Lead Melody
       const lead = this.ctx.createOscillator();
       const lGain = this.ctx.createGain();
       lead.type = track.leadWave;
       lead.frequency.setValueAtTime(track.melodyFreqs[b], now);
-      const baseLeadGain = track.leadWave === 'sawtooth' || track.leadWave === 'square' ? 0.075 : 0.12;
-      lGain.gain.setValueAtTime(b === 0 ? baseLeadGain * 1.2 : baseLeadGain, now);
-      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.155);
+      const baseLeadGain = (track.leadWave === 'sawtooth' || track.leadWave === 'square') ? 0.085 : 0.13;
+      lGain.gain.setValueAtTime(b === 0 ? baseLeadGain * 1.25 : baseLeadGain, now);
+      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
       lead.connect(lGain);
       lGain.connect(this.ctx.destination);
       lead.start(now);
-      lead.stop(now + 0.165);
+      lead.stop(now + 0.18);
     }
 
     /**
@@ -839,6 +950,27 @@
   let state = 'TITLE';
   let gameMode = 'survival'; // 'survival' | 'timeattack'
   let roomType = 'living'; // 'living' (LIVINGROOM) | 'rhythm' (RHYTHMROOM)
+
+  // LIVING ROOM Options ('none' | 'cat' | 'ice')
+  let livingOption = 'none';
+  let livingTapCount = 0;
+
+  // Cat Paw Hazard State (Cat+)
+  const catPaw = {
+    active: false,
+    state: 'idle', // 'idle' | 'warn' | 'thrust' | 'hold' | 'retract'
+    side: 'left', // 'top' | 'bottom' | 'left' | 'right'
+    coord: 0, // position along that side
+    reach: 0, // current extension length (px)
+    maxReach: 0,
+    width: 44, // thickness of paw
+    timer: 0,
+    warnDuration: 0.65,
+    thrustSpeed: 780,
+    holdDuration: 0.45,
+    retractSpeed: 520,
+    nextSpawnTimer: 3.5,
+  };
 
   // 8-Beat Rhythm Room State (5 selectable tracks, BPM 160~180)
   const RHYTHM_BEATS = 8;
@@ -1555,6 +1687,13 @@
     livingBgmTimer = 0;
     livingBgmStep = 0;
 
+    // Reset Cat Paw Hazard
+    catPaw.active = false;
+    catPaw.state = 'idle';
+    catPaw.reach = 0;
+    catPaw.timer = 0;
+    catPaw.nextSpawnTimer = randRange(2.5, 4.5);
+
     if (gameMode === 'survival') {
       maxTime = 16.0;
       timeLeft = 16.0;
@@ -1583,6 +1722,7 @@
     player.isDizzy = false;
     player.hasHelmet = false;
     player.helmetInvulnTimer = 0;
+    player.inertiaFriction = (roomType === 'living' && livingOption === 'ice') ? 1.8 : 9.5;
     player.afterimages = [];
 
     foods = [];
@@ -1886,13 +2026,30 @@
       }
       if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
       if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆曲変更`;
+      if (livingOptionBadge) livingOptionBadge.classList.add('hidden');
     } else {
       hubCard.classList.remove('rhythm-room-active');
-      if (roomCurrentBadge) roomCurrentBadge.textContent = '🏠 LIVING ROOM';
+      let livingTitle = '🏠 LIVING ROOM';
+      if (livingOption === 'cat') livingTitle = '🏠 LIVING ROOM (Cat+)';
+      else if (livingOption === 'ice') livingTitle = '🏠 LIVING ROOM (Ice+)';
+      if (roomCurrentBadge) roomCurrentBadge.textContent = livingTitle;
       if (hubSubText) hubSubText.textContent = '画面タップの位置に高速移動！';
       if (pillLiving) pillLiving.classList.add('active');
       if (pillRhythm) pillRhythm.classList.remove('active');
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
+
+      if (livingOptionBadge) {
+        if (livingOption === 'cat') {
+          livingOptionBadge.classList.remove('hidden', 'ice-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+';
+        } else if (livingOption === 'ice') {
+          livingOptionBadge.classList.remove('hidden');
+          livingOptionBadge.classList.add('ice-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+';
+        } else {
+          livingOptionBadge.classList.add('hidden');
+        }
+      }
     }
   }
 
@@ -1910,7 +2067,9 @@
     });
   }
 
-  // Center Hamster Tap in Mode Select: Switch between 5 Rhythm Tracks (BPM 160~180)
+  // Center Hamster Tap in Mode Select:
+  // - RHYTHM: Switch between 5 tracks
+  // - LIVING: 5 taps cycle through 'none' -> 'cat' -> 'ice' -> 'none'
   if (hubCenterHamster) {
     hubCenterHamster.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1922,7 +2081,21 @@
         playRhythmTrackPreview(rhythmTrackIndex);
       } else {
         hamsterTapPulseTimer = 0.25;
-        sound.playUIClick();
+        livingTapCount++;
+        if (livingTapCount >= 5) {
+          livingTapCount = 0;
+          if (livingOption === 'none') {
+            livingOption = 'cat';
+          } else if (livingOption === 'cat') {
+            livingOption = 'ice';
+          } else {
+            livingOption = 'none';
+          }
+          sound.playCountdown(true); // ポップな通知音
+        } else {
+          sound.playUIClick();
+        }
+        updateRoomSwitchUI();
       }
     });
   }
@@ -2219,6 +2392,9 @@
       }
     }
 
+    // --- Cat Paw Hazard Update (Cat+) ---
+    updateCatPaw(dt);
+
     // --- World Slow-Motion Factor ---
     if (worldSlowTimer > 0) {
       worldSlowTimer = Math.max(0, worldSlowTimer - dt);
@@ -2503,7 +2679,8 @@
       }
 
       if (remDist <= stepDist) {
-        const slideInitialSpeed = 300 * playerSpeedMultiplier;
+        const baseSlideSpeed = (roomType === 'living' && livingOption === 'ice') ? 540 : 300;
+        const slideInitialSpeed = baseSlideSpeed * playerSpeedMultiplier;
         player.vx = ux * slideInitialSpeed;
         player.vy = uy * slideInitialSpeed;
         player.isDashing = false;
@@ -2616,9 +2793,145 @@
     }
   }
 
+  // --- Cat Paw Hazard Helpers (Cat+) ---
+  function getCatPawRect() {
+    if (catPaw.state === 'idle' || catPaw.reach <= 0) return null;
+    const minX = WALL_PADDING;
+    const maxX = width - WALL_PADDING;
+    const minY = HUD_TOP_MARGIN + WALL_PADDING;
+    const maxY = height - WALL_PADDING;
+    const halfW = catPaw.width / 2;
+
+    if (catPaw.side === 'top') {
+      return { x: catPaw.coord - halfW, y: minY, w: catPaw.width, h: catPaw.reach };
+    } else if (catPaw.side === 'bottom') {
+      return { x: catPaw.coord - halfW, y: maxY - catPaw.reach, w: catPaw.width, h: catPaw.reach };
+    } else if (catPaw.side === 'left') {
+      return { x: minX, y: catPaw.coord - halfW, w: catPaw.reach, h: catPaw.width };
+    } else {
+      return { x: maxX - catPaw.reach, y: catPaw.coord - halfW, w: catPaw.reach, h: catPaw.width };
+    }
+  }
+
+  function circleRectCollision(cx, cy, cr, rx, ry, rw, rh) {
+    const clampedX = clamp(cx, rx, rx + rw);
+    const clampedY = clamp(cy, ry, ry + rh);
+    return dist(cx, cy, clampedX, clampedY) < cr;
+  }
+
+  function handleObstacleCatPawBounce(obs) {
+    if (roomType !== 'living' || livingOption !== 'cat' || catPaw.state === 'idle' || catPaw.reach < 6) return;
+    const rect = getCatPawRect();
+    if (!rect) return;
+    if (!circleRectCollision(obs.x, obs.y, obs.radius, rect.x, rect.y, rect.w, rect.h)) return;
+
+    // Bounce obstacle like a solid wall
+    const minX = WALL_PADDING;
+    const maxX = width - WALL_PADDING;
+    const minY = HUD_TOP_MARGIN + WALL_PADDING;
+    const maxY = height - WALL_PADDING;
+
+    if (catPaw.side === 'top') {
+      obs.y = minY + catPaw.reach + obs.radius + 1;
+      obs.vy = Math.abs(obs.vy) || 120;
+    } else if (catPaw.side === 'bottom') {
+      obs.y = maxY - catPaw.reach - obs.radius - 1;
+      obs.vy = -Math.abs(obs.vy) || -120;
+    } else if (catPaw.side === 'left') {
+      obs.x = minX + catPaw.reach + obs.radius + 1;
+      obs.vx = Math.abs(obs.vx) || 120;
+    } else if (catPaw.side === 'right') {
+      obs.x = maxX - catPaw.reach - obs.radius - 1;
+      obs.vx = -Math.abs(obs.vx) || -120;
+    }
+
+    addParticles(obs.x, obs.y, '#f59e0b', 6, 0.6);
+  }
+
+  function updateCatPaw(dt) {
+    if (roomType !== 'living' || livingOption !== 'cat') {
+      catPaw.state = 'idle';
+      catPaw.reach = 0;
+      return;
+    }
+
+    const minX = WALL_PADDING;
+    const maxX = width - WALL_PADDING;
+    const minY = HUD_TOP_MARGIN + WALL_PADDING;
+    const maxY = height - WALL_PADDING;
+
+    if (catPaw.state === 'idle') {
+      catPaw.nextSpawnTimer -= dt;
+      if (catPaw.nextSpawnTimer <= 0) {
+        catPaw.state = 'warn';
+        catPaw.timer = 0;
+        const sides = ['top', 'bottom', 'left', 'right'];
+        catPaw.side = sides[Math.floor(Math.random() * sides.length)];
+
+        if (catPaw.side === 'top' || catPaw.side === 'bottom') {
+          catPaw.coord = randRange(minX + 40, maxX - 40);
+          catPaw.maxReach = (maxY - minY) * randRange(0.40, 0.50);
+        } else {
+          catPaw.coord = randRange(minY + 40, maxY - 40);
+          catPaw.maxReach = (maxX - minX) * randRange(0.40, 0.50);
+        }
+        sound.playSpawnWarn();
+      }
+    } else if (catPaw.state === 'warn') {
+      catPaw.timer += dt;
+      if (catPaw.timer >= catPaw.warnDuration) {
+        catPaw.state = 'thrust';
+        catPaw.reach = 0;
+        sound.playDash(false);
+      }
+    } else if (catPaw.state === 'thrust') {
+      catPaw.reach += catPaw.thrustSpeed * dt;
+      if (catPaw.reach >= catPaw.maxReach) {
+        catPaw.reach = catPaw.maxReach;
+        catPaw.state = 'hold';
+        catPaw.timer = 0;
+      }
+    } else if (catPaw.state === 'hold') {
+      catPaw.timer += dt;
+      if (catPaw.timer >= catPaw.holdDuration) {
+        catPaw.state = 'retract';
+      }
+    } else if (catPaw.state === 'retract') {
+      catPaw.reach -= catPaw.retractSpeed * dt;
+      if (catPaw.reach <= 0) {
+        catPaw.reach = 0;
+        catPaw.state = 'idle';
+        catPaw.nextSpawnTimer = randRange(3.2, 5.2);
+      }
+    }
+
+    // Check collision with obstacles bouncing on cat paw
+    if (catPaw.reach > 4) {
+      if (vacuum) handleObstacleCatPawBounce(vacuum);
+      for (const obs of obstacles) {
+        handleObstacleCatPawBounce(obs);
+      }
+    }
+  }
+
   function checkAllCollisions() {
     if (player.helmetInvulnTimer > 0) {
       return false;
+    }
+
+    // Cat Paw Collision (Cat+)
+    if (roomType === 'living' && livingOption === 'cat' && catPaw.state !== 'idle' && catPaw.reach > 6) {
+      const rect = getCatPawRect();
+      if (rect && circleRectCollision(player.x, player.y, player.radius, rect.x, rect.y, rect.w, rect.h)) {
+        const pawCenter = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+        if (player.hasHelmet) {
+          triggerHelmetBounce(pawCenter);
+          catPaw.state = 'retract';
+          return true;
+        }
+        triggerCrashGameOver(pawCenter, '🐾 飛び出してきた猫の手に捕まった！', 'cat');
+        return true;
+      }
     }
 
     if (vacuum) {
@@ -2844,11 +3157,12 @@
       // Draw the 8-Beat Perimeter Dots & Orbiting Light
       drawRhythmPerimeter(rx, ry, rw, rh);
     } else {
-      // Warm Living Room Wooden Floor & Rug
-      ctx.fillStyle = '#fef3c7';
+      // LIVING ROOM: Warm Wooden Floor OR Clean Simple Ice Blue (Ice+)
+      const isIce = livingOption === 'ice';
+      ctx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
       ctx.fillRect(0, 0, width, height);
 
-      ctx.strokeStyle = 'rgba(217, 119, 6, 0.13)';
+      ctx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
       ctx.lineWidth = 2;
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
@@ -2863,7 +3177,7 @@
       const rw = width - (WALL_PADDING - 8) * 2;
       const rh = height - ry - (WALL_PADDING - 8);
 
-      ctx.fillStyle = 'rgba(254, 249, 195, 0.65)';
+      ctx.fillStyle = isIce ? 'rgba(240, 249, 255, 0.75)' : 'rgba(254, 249, 195, 0.65)';
       roundRect(ctx, rx, ry, rw, rh, 20);
       ctx.fill();
 
@@ -2872,8 +3186,10 @@
           ? 'rgba(192, 38, 211, 0.65)'
           : playerPoisonTimer > 0
           ? 'rgba(126, 34, 206, 0.55)'
+          : isIce
+          ? 'rgba(56, 189, 248, 0.5)'
           : 'rgba(217, 119, 6, 0.35)';
-      ctx.lineWidth = worldSlowTimer > 0 || playerPoisonTimer > 0 ? 4 : 3;
+      ctx.lineWidth = worldSlowTimer > 0 || playerPoisonTimer > 0 || isIce ? 4 : 3;
       ctx.setLineDash([8, 6]);
       roundRect(ctx, rx, ry, rw, rh, 20);
       ctx.stroke();
@@ -2957,6 +3273,30 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('⛑️ ヘルメット装着中 (1回)', width / 2, statusOffsetY + 8.5);
+      ctx.restore();
+      statusOffsetY += 20;
+    }
+
+    if (roomType === 'living' && livingOption !== 'none') {
+      ctx.save();
+      const isIce = livingOption === 'ice';
+      const label = isIce ? '❄️ ICE+ (慣性アップ)' : '🐾 CAT+ (猫の手襲撃)';
+      const barW = isIce ? 134 : 142;
+      const barX = (width - barW) / 2;
+      ctx.fillStyle = isIce ? 'rgba(3, 105, 161, 0.85)' : 'rgba(194, 65, 12, 0.85)';
+      roundRect(ctx, barX, statusOffsetY, barW, 16, 8);
+      ctx.fill();
+
+      ctx.strokeStyle = isIce ? '#bae6fd' : '#fde047';
+      ctx.lineWidth = 1.4;
+      roundRect(ctx, barX, statusOffsetY, barW, 16, 8);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 10px ${POP_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, width / 2, statusOffsetY + 8.5);
       ctx.restore();
     }
   }
@@ -3094,6 +3434,12 @@
       ctx.beginPath();
       ctx.arc(0, 0, ringRadius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lifeRatio);
       ctx.stroke();
+
+      // Custom food image override if present
+      if (assets.drawImage(ctx, f.type.id, 0, 0, f.radius * 2.2, f.radius * 2.2)) {
+        ctx.restore();
+        continue;
+      }
 
       if (f.type.id === 'seed') {
         ctx.rotate(-0.3);
@@ -3342,6 +3688,12 @@
     const moveAngle = Math.atan2(vacuum.vy, vacuum.vx);
     ctx.rotate(moveAngle);
 
+    // Custom vacuum image override if present
+    if (assets.drawImage(ctx, 'vacuum', 0, 0, vacuum.radius * 2.2, vacuum.radius * 2.2)) {
+      ctx.restore();
+      return;
+    }
+
     const brushPositions = [
       { bx: vacuum.radius * 0.55, by: -vacuum.radius * 0.65, dir: 1 },
       { bx: vacuum.radius * 0.55, by: vacuum.radius * 0.65, dir: -1 },
@@ -3434,6 +3786,11 @@
 
       if (obs.kind === 'yarn') {
         ctx.rotate(obs.rotation);
+        if (assets.drawImage(ctx, 'yarn', 0, 0, obs.radius * 2.2, obs.radius * 2.2)) {
+          ctx.restore();
+          continue;
+        }
+
         ctx.fillStyle = '#e11d48';
         ctx.strokeStyle = '#881337';
         ctx.lineWidth = 2.2;
@@ -3508,6 +3865,19 @@
    * Compact Top-Down Whole-Body Hamster Illustration (for gameplay & title hero)
    */
   function drawHamsterOnCtx(targetCtx, x, y, angle, isDashing, alpha = 1, scaleMult = 1, forcePoison = false, forceDizzy = false) {
+    if (assets.hasImage('player')) {
+      targetCtx.save();
+      targetCtx.globalAlpha = alpha;
+      targetCtx.translate(x, y);
+      targetCtx.rotate(angle);
+      const breathe = Math.sin(performance.now() * 0.008) * 0.03;
+      const s = isDashing ? 1.2 : (1 + breathe);
+      targetCtx.scale(scaleMult * s, scaleMult * (2 - s));
+      assets.drawImage(targetCtx, 'player', 0, 0, 36, 36);
+      targetCtx.restore();
+      return;
+    }
+
     targetCtx.save();
     targetCtx.globalAlpha = alpha;
     targetCtx.translate(x, y);
@@ -3740,6 +4110,31 @@
     hCtx.rotate(tilt);
     hCtx.scale(tapScale, tapScale);
 
+    // Custom hub standing hamster image override if present
+    if (assets.hasImage('hub_hamster')) {
+      assets.drawImage(hCtx, 'hub_hamster', 0, 0, 72, 88);
+      if (roomType === 'rhythm') {
+        // DJ Accessories overlay
+        const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
+        hCtx.strokeStyle = '#7c3aed';
+        hCtx.lineWidth = 3.2;
+        hCtx.beginPath();
+        hCtx.arc(0, -10, 21.5, -Math.PI * 0.88, -Math.PI * 0.12);
+        hCtx.stroke();
+
+        hCtx.fillStyle = track.accentColor;
+        hCtx.strokeStyle = '#581c87';
+        hCtx.lineWidth = 1.6;
+        hCtx.beginPath();
+        hCtx.ellipse(-20, -10, 4.5, 7.5, -0.1, 0, Math.PI * 2);
+        hCtx.ellipse(20, -10, 4.5, 7.5, 0.1, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+      }
+      hCtx.restore();
+      return;
+    }
+
     // Soft ground shadow
     hCtx.fillStyle = 'rgba(120, 53, 15, 0.18)';
     hCtx.beginPath();
@@ -3950,6 +4345,13 @@
 
     const cx = cw / 2;
     const cy = ch / 2 + 4;
+
+    // Custom title mascot override if present
+    if (assets.hasImage('title_mascot')) {
+      const bounce = Math.sin(now * 0.0055) * 4.5;
+      assets.drawImage(tCtx, 'title_mascot', cx, cy + bounce, 160, 160);
+      return;
+    }
 
     tCtx.save();
     tCtx.translate(cx, cy);
@@ -4651,6 +5053,62 @@
       for (let i = 0; i < 3; i++) {
         const a = starAng + (i * Math.PI * 2) / 3;
         drawStar(rCtx, 28 + Math.cos(a) * 25, -18 + Math.sin(a) * 7, 4.2);
+      }
+
+      rCtx.restore();
+    } else if (deathCause === 'cat') {
+      rCtx.save();
+      rCtx.translate(cx, cy);
+
+      // Huge Cat Paw coming from top-left
+      rCtx.save();
+      rCtx.translate(-24, 0);
+      rCtx.rotate(0.35);
+
+      rCtx.fillStyle = '#fef3c7';
+      rCtx.strokeStyle = '#c2410c';
+      rCtx.lineWidth = 2.4;
+      rCtx.beginPath();
+      rCtx.ellipse(0, 0, 32, 22, 0, 0, Math.PI * 2);
+      rCtx.fill();
+      rCtx.stroke();
+
+      // Big pink pad
+      rCtx.fillStyle = '#f43f5e';
+      rCtx.beginPath();
+      rCtx.ellipse(-4, 0, 11, 12, 0, 0, Math.PI * 2);
+      rCtx.fill();
+
+      // Little toe pads
+      const ctoes = [
+        { dx: 14, dy: -12, r: 4.5 },
+        { dx: 18, dy: -4, r: 4.8 },
+        { dx: 18, dy: 6, r: 4.8 },
+        { dx: 13, dy: 14, r: 4.5 },
+      ];
+      for (const t of ctoes) {
+        rCtx.beginPath();
+        rCtx.arc(t.dx, t.dy, t.r, 0, Math.PI * 2);
+        rCtx.fill();
+      }
+
+      rCtx.restore();
+
+      // Spiky impact burst
+      rCtx.save();
+      rCtx.translate(6, 2);
+      drawSpikyBurst(rCtx, 8, 18, 8, '#facc15', '#ea580c');
+      rCtx.restore();
+
+      // Dizzy Hamster pushed back
+      const wobble = Math.sin(now * 0.01) * 0.14;
+      drawHamsterOnCtx(rCtx, 38, 4, 0.4 + wobble, false, 1, 2.1, false, true);
+
+      const starAng = now * 0.005;
+      rCtx.fillStyle = '#eab308';
+      for (let i = 0; i < 3; i++) {
+        const a = starAng + (i * Math.PI * 2) / 3;
+        drawStar(rCtx, 40 + Math.cos(a) * 26, -18 + Math.sin(a) * 8, 4.5);
       }
 
       rCtx.restore();
@@ -5359,6 +5817,170 @@
     drawCountdownOverlay();
   }
 
+  function drawCatPaw() {
+    if (roomType !== 'living' || livingOption !== 'cat') return;
+
+    const minX = WALL_PADDING;
+    const maxX = width - WALL_PADDING;
+    const minY = HUD_TOP_MARGIN + WALL_PADDING;
+    const maxY = height - WALL_PADDING;
+
+    let originX = 0;
+    let originY = 0;
+    let angle = 0;
+
+    if (catPaw.side === 'top') {
+      originX = catPaw.coord;
+      originY = minY;
+      angle = Math.PI / 2;
+    } else if (catPaw.side === 'bottom') {
+      originX = catPaw.coord;
+      originY = maxY;
+      angle = -Math.PI / 2;
+    } else if (catPaw.side === 'left') {
+      originX = minX;
+      originY = catPaw.coord;
+      angle = 0;
+    } else {
+      originX = maxX;
+      originY = catPaw.coord;
+      angle = Math.PI;
+    }
+
+    // 1. Warning Marker before extending
+    if (catPaw.state === 'warn') {
+      const pulse = 0.8 + Math.sin(catPaw.timer * 22) * 0.25;
+      ctx.save();
+      ctx.translate(originX, originY);
+      ctx.rotate(angle);
+
+      // Warning dash line along wall edge
+      ctx.strokeStyle = `rgba(239, 68, 68, ${pulse})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, -catPaw.width / 2);
+      ctx.lineTo(0, catPaw.width / 2);
+      ctx.stroke();
+
+      // Flashing Paw alert badge
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(16, 0, 11 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `900 11px ${POP_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🐾', 16, 0);
+
+      ctx.restore();
+      return;
+    }
+
+    // 2. Extending Cat Paw Arm & Paws
+    if (catPaw.reach <= 1) return;
+
+    ctx.save();
+    ctx.translate(originX, originY);
+    ctx.rotate(angle);
+
+    const r = catPaw.reach;
+    const armW = catPaw.width;
+
+    // Custom cat paw image override if present
+    if (assets.hasImage('cat_paw')) {
+      assets.drawImage(ctx, 'cat_paw', r - armW * 0.6, 0, armW * 1.4, armW * 1.4);
+      ctx.restore();
+      return;
+    }
+
+    // Ground soft shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+    ctx.beginPath();
+    ctx.ellipse(r * 0.5, 6, r * 0.52, armW * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cat arm body (Cream / Calico white base)
+    const armGrad = ctx.createLinearGradient(0, -armW / 2, 0, armW / 2);
+    armGrad.addColorStop(0, '#fef3c7');
+    armGrad.addColorStop(0.5, '#fffbeb');
+    armGrad.addColorStop(1, '#fed7aa');
+    ctx.fillStyle = armGrad;
+    ctx.strokeStyle = '#c2410c';
+    ctx.lineWidth = 2.5;
+
+    ctx.beginPath();
+    ctx.moveTo(0, -armW / 2);
+    ctx.lineTo(r - 14, -armW / 2 + 2);
+    ctx.quadraticCurveTo(r + 6, 0, r - 14, armW / 2 - 2);
+    ctx.lineTo(0, armW / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cute Tabby Stripes on the arm
+    ctx.fillStyle = '#ea580c';
+    const stripeCount = Math.max(1, Math.floor(r / 36));
+    for (let i = 1; i <= stripeCount; i++) {
+      const sx = i * 32;
+      if (sx < r - 16) {
+        ctx.beginPath();
+        ctx.ellipse(sx, -armW / 4, 3.5, 8, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(sx + 8, armW / 4, 3.5, 8, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Fluffy Paw Tip (Puffy cat hand)
+    const tipX = r - 10;
+    ctx.fillStyle = '#fffbeb';
+    ctx.strokeStyle = '#c2410c';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(tipX, 0, 16, armW * 0.48, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Cute Pink Paw Pads (肉球)
+    ctx.fillStyle = '#f43f5e';
+    // Main big pad
+    ctx.beginPath();
+    ctx.ellipse(tipX - 2, 0, 8, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4 Little toe beans
+    const toes = [
+      { dx: 7, dy: -12, r: 3.2 },
+      { dx: 9, dy: -4, r: 3.5 },
+      { dx: 9, dy: 4, r: 3.5 },
+      { dx: 7, dy: 12, r: 3.2 },
+    ];
+    for (const toe of toes) {
+      ctx.beginPath();
+      ctx.arc(tipX + toe.dx, toe.dy, toe.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Little cute white claws
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#c2410c';
+    ctx.lineWidth = 1.2;
+    for (const toe of toes) {
+      ctx.beginPath();
+      ctx.moveTo(tipX + toe.dx + toe.r * 0.6, toe.dy);
+      ctx.lineTo(tipX + toe.dx + toe.r * 1.8, toe.dy);
+      ctx.lineTo(tipX + toe.dx + toe.r * 0.6, toe.dy + 1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   function render() {
     ctx.save();
     if (screenShake > 0) {
@@ -5381,6 +6003,7 @@
     drawHamster(player.x, player.y, player.angle, player.isDashing, 1);
     drawVacuum();
     drawExtraObstacles();
+    drawCatPaw();
     drawEffects();
 
     ctx.restore();
