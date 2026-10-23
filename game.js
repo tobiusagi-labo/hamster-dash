@@ -1922,9 +1922,12 @@
     const ratio = clamp((displayTime / maxTime) * 100, 0, 100);
     timerBarFill.style.width = `${ratio}%`;
 
+    const timerBox = document.getElementById('timer-box');
     if (displayTime <= 4.0) {
+      if (timerBox) timerBox.classList.add('timer-urgent');
       timerBarFill.classList.add('danger');
     } else {
+      if (timerBox) timerBox.classList.remove('timer-urgent');
       timerBarFill.classList.remove('danger');
     }
   }
@@ -1968,11 +1971,15 @@
 
   function handleTap(clientX, clientY) {
     if (state !== 'PLAYING' || isPaused) return;
-    sound.init();
 
     const rect = canvas.getBoundingClientRect();
     const rawX = (clientX - rect.left) / viewScaleX;
     const rawY = (clientY - rect.top) / viewScaleY;
+
+    // Ignore taps inside or above top HUD area (score, time, menu, progress bar)
+    if (rawY < HUD_TOP_MARGIN) return;
+
+    sound.init();
 
     const tx = clamp(rawX, WALL_PADDING, width - WALL_PADDING);
     const ty = clamp(rawY, HUD_TOP_MARGIN + WALL_PADDING, height - WALL_PADDING);
@@ -2077,6 +2084,13 @@
       statsModal.classList.add('hidden');
     }
   });
+
+  // Stop tap propagation on HUD so taps on score or menu don't move the hamster
+  if (hud) {
+    hud.addEventListener('pointerdown', (e) => e.stopPropagation());
+    hud.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+    hud.addEventListener('click', (e) => e.stopPropagation());
+  }
 
   // UI Buttons
   if (soundBtn) {
@@ -2188,7 +2202,7 @@
         roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName})`;
       }
       if (hubSubText) {
-        hubSubText.textContent = 'リズムに合わせて高速移動‼';
+        hubSubText.innerHTML = 'リズムに合わせて高速移動‼ <span class="rhythm-sound-note">※音あり推奨</span>';
       }
       if (pillLiving) pillLiving.classList.remove('active');
       if (pillRhythm) pillRhythm.classList.add('active');

@@ -88,10 +88,12 @@ html, body {
   top: 0;
   left: 0;
   right: 0;
-  padding: 12px 14px 8px;
+  padding: 10px 12px 6px;
   z-index: 10;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(67, 40, 24, 0.78) 0%, rgba(67, 40, 24, 0.35) 72%, rgba(67, 40, 24, 0) 100%);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  background: linear-gradient(180deg, rgba(67, 40, 24, 0.85) 0%, rgba(67, 40, 24, 0.42) 74%, rgba(67, 40, 24, 0) 100%);
 }
 
 .hud-top-row {
@@ -210,6 +212,63 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.timer-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 2.5px solid #0284c7;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.28);
+  white-space: nowrap;
+  flex-shrink: 0;
+  pointer-events: auto;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+#hud.mode-survival .timer-box {
+  border-color: #ea580c;
+  box-shadow: 0 3px 8px rgba(234, 88, 12, 0.28);
+}
+
+.timer-box .timer-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.timer-box #time-text {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0369a1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  min-width: 46px;
+  text-align: right;
+  line-height: 1.1;
+}
+
+#hud.mode-survival .timer-box #time-text {
+  color: #9a3412;
+}
+
+.timer-box.timer-urgent {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border-color: #dc2626 !important;
+  box-shadow: 0 3px 12px rgba(220, 38, 38, 0.45);
+  animation: urgent-pulse 0.4s infinite alternate;
+}
+
+.timer-box.timer-urgent #time-text {
+  color: #b91c1c !important;
+}
+
+@keyframes urgent-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 
 .icon-btn {
@@ -572,6 +631,19 @@ html, body {
 
 .hub-card.rhythm-room-active .hub-sub {
   color: #7e22ce;
+}
+
+.rhythm-sound-note {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #db2777;
+  background: rgba(244, 114, 182, 0.18);
+  border: 1px solid rgba(219, 39, 119, 0.35);
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 
 .hub-title {
@@ -1241,7 +1313,39 @@ html, body {
 .result-actions {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.result-btn {
+  width: 100%;
+  border: none;
+  border-radius: 18px;
+  padding: 13px 16px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  transition: transform 0.1s ease;
+  box-sizing: border-box;
+}
+
+.result-home-btn {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  box-shadow: 0 5px 0 #0369a1, 0 8px 16px rgba(2, 132, 199, 0.35);
+}
+
+.result-retry-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 5px 0 #15803d, 0 8px 16px rgba(22, 163, 74, 0.35);
+}
+
+.result-btn:active {
+  transform: translateY(2px);
 }
 
 .primary-btn {
