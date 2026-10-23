@@ -1490,19 +1490,29 @@
     screenShake = 13;
     sound.playHelmetBounce();
 
-    let bounceAng = Math.atan2(player.y - hitObs.y, player.x - hitObs.x);
-    if (Math.hypot(player.y - hitObs.y, player.x - hitObs.x) < 0.01) {
+    const obsHitR = (hitObs && typeof hitObs.hitRadius === 'number' && !isNaN(hitObs.hitRadius))
+      ? hitObs.hitRadius
+      : 24;
+    const obsX = (hitObs && typeof hitObs.x === 'number' && !isNaN(hitObs.x))
+      ? hitObs.x
+      : player.x;
+    const obsY = (hitObs && typeof hitObs.y === 'number' && !isNaN(hitObs.y))
+      ? hitObs.y
+      : player.y;
+
+    let bounceAng = Math.atan2(player.y - obsY, player.x - obsX);
+    if (Math.hypot(player.y - obsY, player.x - obsX) < 0.01) {
       bounceAng = -player.angle;
     }
 
-    const impactX = (player.x + hitObs.x) * 0.5;
-    const impactY = (player.y + hitObs.y) * 0.5;
+    const impactX = (player.x + obsX) * 0.5;
+    const impactY = (player.y + obsY) * 0.5;
 
     // Immediately separate player outside obstacle hit radius
-    const minSep = player.radius + hitObs.hitRadius + 7;
-    player.x = clamp(hitObs.x + Math.cos(bounceAng) * minSep, WALL_PADDING, width - WALL_PADDING);
+    const minSep = player.radius + obsHitR + 7;
+    player.x = clamp(obsX + Math.cos(bounceAng) * minSep, WALL_PADDING, width - WALL_PADDING);
     player.y = clamp(
-      hitObs.y + Math.sin(bounceAng) * minSep,
+      obsY + Math.sin(bounceAng) * minSep,
       HUD_TOP_MARGIN + WALL_PADDING,
       height - WALL_PADDING
     );
@@ -1514,9 +1524,11 @@
     player.angle = bounceAng;
 
     // Also knock the obstacle back in the opposite direction
-    const obsSpeed = Math.hypot(hitObs.vx, hitObs.vy) || 160;
-    hitObs.vx = -Math.cos(bounceAng) * obsSpeed * 1.15;
-    hitObs.vy = -Math.sin(bounceAng) * obsSpeed * 1.15;
+    if (hitObs && typeof hitObs.vx === 'number' && typeof hitObs.vy === 'number') {
+      const obsSpeed = Math.hypot(hitObs.vx, hitObs.vy) || 160;
+      hitObs.vx = -Math.cos(bounceAng) * obsSpeed * 1.15;
+      hitObs.vy = -Math.sin(bounceAng) * obsSpeed * 1.15;
+    }
 
     addParticles(impactX, impactY, '#38bdf8', 18, 1.8, true);
     addParticles(impactX, impactY, '#facc15', 16, 1.9, true);
@@ -1824,9 +1836,12 @@
     screenShake = 14;
     sound.playCrash();
 
-    const angToPlayer = Math.atan2(player.y - hitObs.y, player.x - hitObs.x);
-    const impactX = (player.x + hitObs.x) * 0.5;
-    const impactY = (player.y + hitObs.y) * 0.5;
+    const obsX = (hitObs && typeof hitObs.x === 'number' && !isNaN(hitObs.x)) ? hitObs.x : player.x;
+    const obsY = (hitObs && typeof hitObs.y === 'number' && !isNaN(hitObs.y)) ? hitObs.y : player.y;
+
+    const angToPlayer = Math.atan2(player.y - obsY, player.x - obsX);
+    const impactX = (player.x + obsX) * 0.5;
+    const impactY = (player.y + obsY) * 0.5;
 
     player.vx = Math.cos(angToPlayer) * 340;
     player.vy = Math.sin(angToPlayer) * 340;
@@ -2616,6 +2631,14 @@
       }
     }
 
+    // Ensure player coordinates are always valid numbers
+    if (isNaN(player.x) || isNaN(player.y) || isNaN(player.vx) || isNaN(player.vy)) {
+      player.x = width / 2;
+      player.y = HUD_TOP_MARGIN + (height - HUD_TOP_MARGIN) * 0.65;
+      player.vx = 0;
+      player.vy = 0;
+    }
+
     // Time & Difficulty Progression
     elapsedTime += dt;
     timeLeft -= dt;
@@ -3110,7 +3133,13 @@
     if (roomType === 'living' && livingOption === 'cat' && catPaw.state !== 'idle' && catPaw.reach > 6) {
       const rect = getCatPawRect();
       if (rect && circleRectCollision(player.x, player.y, player.radius, rect.x, rect.y, rect.w, rect.h)) {
-        const pawCenter = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+        const pawCenter = {
+          x: rect.x + rect.w / 2,
+          y: rect.y + rect.h / 2,
+          hitRadius: Math.min(rect.w, rect.h) * 0.5,
+          vx: 0,
+          vy: 0
+        };
         if (player.hasHelmet) {
           triggerHelmetBounce(pawCenter);
           catPaw.state = 'retract';
