@@ -1062,7 +1062,7 @@
     coord: 0, // position along that side
     reach: 0, // current extension length (px)
     maxReach: 0,
-    width: 50, // thickness of paw
+    width: 60, // thickness of paw
     timer: 0,
     warnDuration: 0.65,
     thrustSpeed: 780,
@@ -3101,10 +3101,10 @@
 
         if (catPaw.side === 'top' || catPaw.side === 'bottom') {
           catPaw.coord = randRange(minX + 40, maxX - 40);
-          catPaw.maxReach = (maxY - minY) * randRange(0.40, 0.50);
+          catPaw.maxReach = Math.min(245, (maxY - minY) * randRange(0.40, 0.46));
         } else {
           catPaw.coord = randRange(minY + 40, maxY - 40);
-          catPaw.maxReach = (maxX - minX) * randRange(0.40, 0.50);
+          catPaw.maxReach = Math.min(165, (maxX - minX) * randRange(0.40, 0.46));
         }
         sound.playSpawnWarn();
       }
@@ -6122,26 +6122,31 @@
       const img = assets.getImage(activePawKey);
       if (img && img.naturalWidth) {
         ctx.save();
-        // Clip to the visible area coming out of the wall (x >= 0)
+        // Clip to the room interior (x >= 0 so the arm emerges perpendicularly from behind the wall)
         ctx.beginPath();
-        ctx.rect(0, -armW * 2.5, r + 25, armW * 5);
+        ctx.rect(0, -height, width * 2, height * 2);
         ctx.clip();
 
-        const drawH = armW * 1.85;
-        const aspect = img.naturalWidth / img.naturalHeight;
-        const drawW = Math.max(r + 40, drawH * aspect);
+        // Exact tip & base alignment parameters for natural perpendicular extension without stretching
+        // Paw 1: Grey cat paw with pink pads (natural tilt 24.4°, rotated so arm vector is 100% perpendicular)
+        // Paw 2: Tabby cat paw with dark pads (natural tilt 9.9°, rotated so arm vector is 100% perpendicular)
+        const isPaw2 = activePawKey === 'cat_paw_2';
+        const tipX = isPaw2 ? 53 : 77;
+        const tipY = isPaw2 ? 264 : 1;
+        const rot = isPaw2 ? 2.9694 : 2.7155;
+        const s = isPaw2 ? 0.31 : 0.30; // 100% UNIFORM scale: NEVER stretch or distort aspect ratio!
 
-        // Ground soft shadow
+        // Ground soft shadow beneath the paw
         ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
         ctx.beginPath();
-        ctx.ellipse(r * 0.5, 8, r * 0.52, armW * 0.45, 0, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.5, 6, r * 0.52, armW * 0.42, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // The image has the paw on the left (x=0) and arm on the right (x=drawW).
-        // By translating to r and scaling X by -1, the paw is at r and arm extends back towards 0!
+        // Translate to reach tip (r, 0), rotate along normal, scale uniformly, draw image
         ctx.translate(r, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(img, 0, -drawH / 2, drawW, drawH);
+        ctx.rotate(rot);
+        ctx.scale(s, s);
+        ctx.drawImage(img, -tipX, -tipY);
 
         ctx.restore();
         ctx.restore();
