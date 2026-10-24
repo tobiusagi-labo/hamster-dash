@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -85,7 +85,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.4.3</div>
+          <div class="title-version-badge">ver 1.4.4</div>
         </div>
       </div>
 
@@ -285,8 +285,11 @@
           </div>
 
           <!-- 2. Rhythm Timing Calibration -->
-          <div class="settings-section">
-            <div class="settings-section-title">⏱️ リズム判定・音ズレ調整</div>
+          <div class="settings-section" id="settings-timing-section">
+            <div class="settings-section-title">
+              <span>⏱️ リズム判定・音ズレ調整</span>
+              <span class="settings-room-badge" id="timing-room-badge">RHYTHM ONLY</span>
+            </div>
             <p class="settings-desc">
               Bluetoothイヤホンや端末ごとの遅延を補正できます。<br>
               「光が早すぎる」場合は<strong>＋</strong>、「音が早すぎる」場合は<strong>−</strong>を押してください。
@@ -298,6 +301,15 @@
             </div>
             <div class="timing-reset-row">
               <button type="button" class="timing-reset-btn" id="btn-timing-reset">初期値に戻す (0ms)</button>
+            </div>
+
+            <!-- Mini Live Interactive Sync Test Stage -->
+            <div class="timing-test-container" id="timing-test-container">
+              <div class="timing-test-header">
+                <span class="timing-test-label">🎮 リアルタイム同期テスト</span>
+                <span class="timing-test-sub">※タップで予約ダッシュ</span>
+              </div>
+              <canvas id="timing-test-canvas" width="310" height="120"></canvas>
             </div>
           </div>
 
@@ -378,6 +390,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=18"></script>
+  <script src="game.js?v=19"></script>
 </body>
 </html>

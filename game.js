@@ -60,6 +60,19 @@
   const btnTimingPlus = document.getElementById('btn-timing-plus');
   const btnTimingReset = document.getElementById('btn-timing-reset');
   const timingValDisplay = document.getElementById('timing-val-display');
+  const timingTestCanvas = document.getElementById('timing-test-canvas');
+  const timingTestCtx = timingTestCanvas ? timingTestCanvas.getContext('2d') : null;
+  const timingStage = {
+    hamsterX: 155,
+    hamsterY: 55,
+    targetX: 155,
+    targetY: 55,
+    facingRight: true,
+    lastTapResult: null,
+    particles: [],
+    pulse: 0,
+    lastBeatIndex: -1,
+  };
   const btnPauseSe = document.getElementById('btn-pause-se');
   const btnRetry = document.getElementById('btn-retry');
   const btnHome = document.getElementById('btn-home');
@@ -101,7 +114,7 @@
     }
 
     initImageLoaders() {
-      const v = '18';
+      const v = '19';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -139,7 +152,7 @@
     }
 
     initSoundLoaders() {
-      const v = '18';
+      const v = '19';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -496,8 +509,14 @@
         this.playerB._key = key;
       }
 
-      this.playerA.loop = false; // 手動のシームレス・クロスフェードループで無音ギャップを完全解消
-      this.playerB.loop = false;
+      const isRhythm = key.startsWith('rhythm_');
+      if (isRhythm) {
+        this.playerA.loop = true;
+        this.bgmLoopEnabled = false; // リズム曲は早すぎるクロスフェードを避け、小節がズレないネイティブループ
+      } else {
+        this.playerA.loop = false;
+        this.bgmLoopEnabled = loop;
+      }
 
       const targetVol = this.getTargetBgmVolume();
       this.playerA.volume = targetVol;
@@ -719,7 +738,8 @@
       osc.type = isGo ? 'sawtooth' : 'triangle';
 
       let freq = 440; // 3: A4
-      if (step === 2) freq = 554.37; // 2: C#5
+      if (step >= 4) freq = 349.23; // READY: F4
+      else if (step === 2) freq = 554.37; // 2: C#5
       else if (step === 1) freq = 659.25; // 1: E5
       else if (isGo) freq = 880; // GO: A5 -> D6
 
@@ -2114,8 +2134,8 @@
     sound.playUIClick();
     gameMode = mode;
     state = 'COUNTDOWN';
-    countdownTimer = 3.0;
-    lastCountdownBeep = 4;
+    countdownTimer = 4.0;
+    lastCountdownBeep = 5;
     startBannerTimer = 0;
 
     rhythmTimer = 0;
@@ -2691,6 +2711,25 @@
         hubCenterHamster.title = livingOption === 'none' ? '5回タップで裏モード切替' : `現在: ${livingOption.toUpperCase()}+ (5回タップで切替)`;
       }
     }
+
+    // Toggle Timing Adjustment availability based on Room Type
+    const timingSection = document.getElementById('settings-timing-section');
+    const timingRoomBadge = document.getElementById('timing-room-badge');
+    if (timingSection) {
+      if (roomType === 'rhythm') {
+        timingSection.classList.remove('section-disabled');
+        if (timingRoomBadge) {
+          timingRoomBadge.textContent = 'RHYTHM ONLY';
+          timingRoomBadge.style.background = '#ec4899';
+        }
+      } else {
+        timingSection.classList.add('section-disabled');
+        if (timingRoomBadge) {
+          timingRoomBadge.textContent = '※RHYTHM ROOM専用 (リビングでは無効)';
+          timingRoomBadge.style.background = '#94a3b8';
+        }
+      }
+    }
   }
 
   function switchRoom(targetType) {
@@ -2855,6 +2894,10 @@
       sound.init();
       sound.playUIClick();
       sound.syncAudioUI();
+      updateRoomSwitchUI();
+      if (roomType === 'rhythm' && !sound.bgmMuted) {
+        syncRoomBgm();
+      }
       if (settingsModal) settingsModal.classList.remove('hidden');
     });
   }
@@ -2909,6 +2952,94 @@
       sound.init();
       sound.resetTimingOffset();
     });
+  }
+
+  // Interactive Live Timing Test Canvas Handler (Settings Modal)
+  if (timingTestCanvas) {
+    const handleTimingTestTap = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sound.init();
+
+      if (roomType !== 'rhythm') return;
+
+      const rect = timingTestCanvas.getBoundingClientRect();
+      const scaleX = timingTestCanvas.width / (rect.width || 1);
+      const scaleY = timingTestCanvas.height / (rect.height || 1);
+      const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+      const tapX = Math.max(28, Math.min(timingTestCanvas.width - 28, (clientX - rect.left) * scaleX));
+      const tapY = Math.max(26, Math.min(84, (clientY - rect.top) * scaleY));
+
+      const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+      const bpm = track.bpm || 160;
+      const beatInterval = 60 / bpm;
+      const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+
+      let curTime = 0;
+      const aud = sound.currentBgmAudio;
+      if (aud && !aud.paused && aud.duration > 0) {
+        curTime = Math.max(0, aud.currentTime - offsetSec);
+      } else {
+        curTime = Math.max(0, (performance.now() * 0.001) - offsetSec);
+      }
+
+      const totalBeats = curTime / beatInterval;
+      const beatPhase = totalBeats % 1.0;
+      const phaseDiff = beatPhase > 0.5 ? beatPhase - 1.0 : beatPhase;
+      const diffMs = Math.round(phaseDiff * beatInterval * 1000);
+      const absDiff = Math.abs(diffMs);
+
+      let rating = 'PERFECT!!';
+      let ratingColor = '#facc15'; // Gold
+      if (absDiff <= 45) {
+        rating = 'PERFECT!!';
+        ratingColor = '#facc15';
+      } else if (absDiff <= 90) {
+        rating = 'GREAT!';
+        ratingColor = '#4ade80'; // Emerald
+      } else if (absDiff <= 145) {
+        rating = 'GOOD';
+        ratingColor = '#fb923c'; // Orange
+      } else {
+        rating = diffMs < 0 ? 'EARLY' : 'LATE';
+        ratingColor = '#f43f5e'; // Rose
+      }
+
+      const sign = diffMs > 0 ? '+' : '';
+      timingStage.lastTapResult = {
+        rating,
+        diffMs: `${sign}${diffMs}ms`,
+        color: ratingColor,
+        life: 1.0
+      };
+
+      // Play dash sound effect
+      sound.playDash();
+
+      // Trigger hamster dash
+      timingStage.targetX = tapX;
+      timingStage.targetY = tapY;
+      timingStage.facingRight = tapX >= timingStage.hamsterX;
+
+      // Spawn burst particles
+      for (let i = 0; i < 9; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = randRange(30, 95);
+        timingStage.particles.push({
+          x: tapX,
+          y: tapY,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          color: ratingColor,
+          life: 0.45,
+          maxLife: 0.45,
+          size: randRange(2.5, 4.5)
+        });
+      }
+    };
+
+    timingTestCanvas.addEventListener('pointerdown', handleTimingTestTap);
   }
 
   btnRetry.addEventListener('click', () => startGame(gameMode));
@@ -5867,8 +5998,241 @@
     }
   }
 
+  // --- Interactive Rhythm Calibration Test Stage (Settings Modal) ---
+  function drawTimingTestStage(now, dt = 0.016) {
+    if (!timingTestCtx || !timingTestCanvas) return;
+    const cw = timingTestCanvas.width;
+    const ch = timingTestCanvas.height;
+
+    timingTestCtx.clearRect(0, 0, cw, ch);
+
+    // Rounded clip background
+    timingTestCtx.save();
+    timingTestCtx.beginPath();
+    timingTestCtx.roundRect(0, 0, cw, ch, 10);
+    timingTestCtx.clip();
+
+    // Dark sleek cyber arena background
+    timingTestCtx.fillStyle = '#090d16';
+    timingTestCtx.fillRect(0, 0, cw, ch);
+
+    if (roomType !== 'rhythm') {
+      // Grayed out state for Living Room
+      timingTestCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      timingTestCtx.fillRect(0, 0, cw, ch);
+
+      timingTestCtx.font = `700 13px ${POP_FONT}`;
+      timingTestCtx.textAlign = 'center';
+      timingTestCtx.textBaseline = 'middle';
+      timingTestCtx.fillStyle = '#94a3b8';
+      timingTestCtx.fillText('※リズムルーム選択時のみ利用できます', cw / 2, ch / 2 - 8);
+      timingTestCtx.font = `11px ${POP_FONT}`;
+      timingTestCtx.fillStyle = '#64748b';
+      timingTestCtx.fillText('(ルーム選択で「RHYTHM ROOM」に切り替えてください)', cw / 2, ch / 2 + 12);
+      timingTestCtx.restore();
+      return;
+    }
+
+    const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+    const accentColor = track.accentColor || '#ec4899';
+    const bpm = track.bpm || 160;
+    const beatInterval = 60 / bpm;
+    const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+
+    let curTime = 0;
+    const aud = sound.currentBgmAudio;
+    if (aud && !aud.paused && aud.duration > 0) {
+      curTime = Math.max(0, aud.currentTime - offsetSec);
+    } else {
+      curTime = Math.max(0, (now * 0.001) - offsetSec);
+    }
+
+    const totalBeats = curTime / beatInterval;
+    const beatPhase = totalBeats % 1.0;
+    const currentBeat = Math.floor(totalBeats) % 8;
+
+    if (currentBeat !== timingStage.lastBeatIndex) {
+      timingStage.lastBeatIndex = currentBeat;
+      timingStage.pulse = 1.0;
+    }
+    timingStage.pulse = Math.max(0, timingStage.pulse - dt * 4.2);
+
+    // 1. Grid pattern & subtle arena lines
+    timingTestCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    timingTestCtx.lineWidth = 1;
+    for (let x = 20; x < cw; x += 20) {
+      timingTestCtx.beginPath();
+      timingTestCtx.moveTo(x, 0);
+      timingTestCtx.lineTo(x, ch);
+      timingTestCtx.stroke();
+    }
+    for (let y = 15; y < ch; y += 15) {
+      timingTestCtx.beginPath();
+      timingTestCtx.moveTo(0, y);
+      timingTestCtx.lineTo(cw, y);
+      timingTestCtx.stroke();
+    }
+
+    // 2. Mini neon perimeter & glowing border
+    const pulseAlpha = 0.25 + timingStage.pulse * 0.45;
+    timingTestCtx.strokeStyle = hexToRgba(accentColor, pulseAlpha);
+    timingTestCtx.lineWidth = 2.5 + timingStage.pulse * 1.5;
+    timingTestCtx.strokeRect(6, 6, cw - 12, ch - 12);
+
+    // Mini comet orbiting along border
+    const perimeter = (cw - 12) * 2 + (ch - 12) * 2;
+    const cometDist = ((curTime * 1.5) % 1.0) * perimeter;
+    let cometX = 6, cometY = 6;
+    const topLen = cw - 12;
+    const rightLen = ch - 12;
+    const bottomLen = cw - 12;
+    if (cometDist < topLen) {
+      cometX = 6 + cometDist;
+      cometY = 6;
+    } else if (cometDist < topLen + rightLen) {
+      cometX = cw - 6;
+      cometY = 6 + (cometDist - topLen);
+    } else if (cometDist < topLen + rightLen + bottomLen) {
+      cometX = (cw - 6) - (cometDist - topLen - rightLen);
+      cometY = ch - 6;
+    } else {
+      cometX = 6;
+      cometY = (ch - 6) - (cometDist - topLen - rightLen - bottomLen);
+    }
+    timingTestCtx.fillStyle = '#ffffff';
+    timingTestCtx.shadowColor = accentColor;
+    timingTestCtx.shadowBlur = 8;
+    timingTestCtx.beginPath();
+    timingTestCtx.arc(cometX, cometY, 2.5 + timingStage.pulse * 1.5, 0, Math.PI * 2);
+    timingTestCtx.fill();
+    timingTestCtx.shadowBlur = 0;
+
+    // 3. Hamster Movement & Rendering
+    timingStage.hamsterX += (timingStage.targetX - timingStage.hamsterX) * Math.min(1, dt * 14);
+    timingStage.hamsterY += (timingStage.targetY - timingStage.hamsterY) * Math.min(1, dt * 14);
+
+    const bounceY = -Math.abs(Math.sin(beatPhase * Math.PI)) * 5;
+    const squishX = 1 + (1 - Math.abs(Math.sin(beatPhase * Math.PI))) * 0.12;
+    const squishY = 1 / squishX;
+
+    timingTestCtx.save();
+    timingTestCtx.translate(timingStage.hamsterX, timingStage.hamsterY + bounceY);
+    timingTestCtx.scale(timingStage.facingRight ? squishX : -squishX, squishY);
+
+    if (assets.hasImage('player')) {
+      const img = assets.getImage('player');
+      timingTestCtx.drawImage(img, -18, -18, 36, 36);
+    } else {
+      // Fallback cute hamster
+      timingTestCtx.fillStyle = '#f59e0b';
+      timingTestCtx.beginPath();
+      timingTestCtx.arc(0, 0, 14, 0, Math.PI * 2);
+      timingTestCtx.fill();
+      timingTestCtx.fillStyle = '#ffffff';
+      timingTestCtx.beginPath();
+      timingTestCtx.arc(4, -3, 3, 0, Math.PI * 2);
+      timingTestCtx.fill();
+      timingTestCtx.fillStyle = '#1e293b';
+      timingTestCtx.beginPath();
+      timingTestCtx.arc(5, -3, 1.5, 0, Math.PI * 2);
+      timingTestCtx.fill();
+    }
+    timingTestCtx.restore();
+
+    // 4. Update & draw particles
+    for (let i = timingStage.particles.length - 1; i >= 0; i--) {
+      const p = timingStage.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        timingStage.particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const alpha = Math.max(0, p.life / p.maxLife);
+      timingTestCtx.fillStyle = hexToRgba(p.color, alpha);
+      timingTestCtx.beginPath();
+      timingTestCtx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+      timingTestCtx.fill();
+    }
+
+    // 5. Floating Tap Result Rating
+    if (timingStage.lastTapResult && timingStage.lastTapResult.life > 0) {
+      const res = timingStage.lastTapResult;
+      res.life -= dt * 0.9;
+      const alpha = Math.max(0, Math.min(1, res.life * 1.4));
+      const floatUp = (1.0 - res.life) * 16;
+
+      timingTestCtx.save();
+      timingTestCtx.font = `900 13px ${POP_FONT}`;
+      timingTestCtx.textAlign = 'center';
+      timingTestCtx.textBaseline = 'bottom';
+      timingTestCtx.shadowColor = res.color;
+      timingTestCtx.shadowBlur = 6;
+      timingTestCtx.fillStyle = hexToRgba(res.color, alpha);
+      timingTestCtx.fillText(`${res.rating} (${res.diffMs})`, timingStage.hamsterX, timingStage.hamsterY - 20 - floatUp);
+      timingTestCtx.restore();
+    } else {
+      // Gentle hint when idle
+      timingTestCtx.font = `700 10px ${POP_FONT}`;
+      timingTestCtx.textAlign = 'center';
+      timingTestCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      timingTestCtx.fillText('👆 ここをタップして判定テスト！', cw / 2, 22);
+    }
+
+    // 6. Bottom Timing Calibration Gauge & Beat Waveform Indicator
+    const barY = ch - 16;
+    const barLeft = 24;
+    const barRight = cw - 24;
+    const barW = barRight - barLeft;
+
+    // Track line
+    timingTestCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    timingTestCtx.lineWidth = 3;
+    timingTestCtx.lineCap = 'round';
+    timingTestCtx.beginPath();
+    timingTestCtx.moveTo(barLeft, barY);
+    timingTestCtx.lineTo(barRight, barY);
+    timingTestCtx.stroke();
+
+    // Center target (Beat 0/Downbeat point)
+    const midX = barLeft + barW / 2;
+    timingTestCtx.fillStyle = '#facc15';
+    timingTestCtx.shadowColor = '#facc15';
+    timingTestCtx.shadowBlur = timingStage.pulse * 10;
+    timingTestCtx.beginPath();
+    timingTestCtx.arc(midX, barY, 4.5 + timingStage.pulse * 2, 0, Math.PI * 2);
+    timingTestCtx.fill();
+    timingTestCtx.shadowBlur = 0;
+
+    // Live Moving Marker synced to Beat + Offset
+    const markerFrac = ((beatPhase + 0.5) % 1.0);
+    const markerX = barLeft + markerFrac * barW;
+    timingTestCtx.fillStyle = accentColor;
+    timingTestCtx.shadowColor = accentColor;
+    timingTestCtx.shadowBlur = 8;
+    timingTestCtx.beginPath();
+    timingTestCtx.arc(markerX, barY, 4, 0, Math.PI * 2);
+    timingTestCtx.fill();
+    timingTestCtx.shadowBlur = 0;
+
+    // Bar Labels
+    timingTestCtx.font = `800 8px ${POP_FONT}`;
+    timingTestCtx.textAlign = 'center';
+    timingTestCtx.fillStyle = '#facc15';
+    timingTestCtx.fillText('BEAT', midX, barY - 7);
+
+    timingTestCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    timingTestCtx.textAlign = 'left';
+    timingTestCtx.fillText('EARLY (-)', barLeft, barY + 11);
+    timingTestCtx.textAlign = 'right';
+    timingTestCtx.fillText('LATE (+)', barRight, barY + 11);
+
+    timingTestCtx.restore();
+  }
+
   // --- Title Splash & Hub Whole-Body Hamster Illustrations ---
-  function renderMenuCanvases(now) {
+  function renderMenuCanvases(now, dt = 0.016) {
     // 1. Title Splash Canvas (Cute & Stylish Mascot Scene!)
     if (state === 'TITLE' && titleHeroCanvas) {
       drawCuteTitleMascot(titleHeroCanvas.getContext('2d'), now);
@@ -5886,6 +6250,11 @@
     // 3. Game Over / Clear Result Illustration Canvas
     if (state === 'GAMEOVER' && resultIllustCanvas) {
       drawResultIllustration(resultIllustCanvas.getContext('2d'), now);
+    }
+
+    // 4. Rhythm Timing Calibration Test Stage (Settings Modal)
+    if (settingsModal && !settingsModal.classList.contains('hidden') && timingTestCanvas) {
+      drawTimingTestStage(now, dt);
     }
   }
 
@@ -6775,27 +7144,30 @@
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
 
-      ctx.font = `900 92px ${POP_FONT}`;
+      const label = num >= 4 ? 'READY!' : String(num);
+      ctx.font = `900 ${num >= 4 ? 64 : 92}px ${POP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 14;
-      ctx.strokeText(String(num), 0, 4);
+      ctx.strokeText(label, 0, 4);
 
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 8;
-      ctx.strokeText(String(num), 0, 0);
+      ctx.strokeText(label, 0, 0);
 
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillText(String(num), 0, 0);
+      ctx.fillStyle = num >= 4 ? '#38bdf8' : '#f59e0b';
+      ctx.fillText(label, 0, 0);
 
-      ctx.font = `900 16px ${POP_FONT}`;
-      ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 5;
-      ctx.strokeText('READY...', 0, 62);
-      ctx.fillStyle = '#fffbeb';
-      ctx.fillText('READY...', 0, 62);
+      if (num < 4) {
+        ctx.font = `900 16px ${POP_FONT}`;
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 5;
+        ctx.strokeText('READY...', 0, 62);
+        ctx.fillStyle = '#fffbeb';
+        ctx.fillText('READY...', 0, 62);
+      }
     } else if (startBannerTimer > 0) {
       const ratio = clamp(startBannerTimer / 0.42, 0, 1);
       const scale = 1 + (1 - ratio) * 0.45;
@@ -7116,7 +7488,7 @@
     sound.updateBgmLoop(dt);
     update(dt);
     render();
-    renderMenuCanvases(now);
+    renderMenuCanvases(now, dt);
 
     requestAnimationFrame(loop);
   }
