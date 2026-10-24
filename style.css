@@ -704,65 +704,18 @@ html, body {
   margin-top: -4px;
   background: linear-gradient(135deg, #581c87, #3b0764);
   border: 2px solid #f472b6;
-  border-radius: 14px;
-  padding: 4px 6px 3px;
+  border-radius: 12px;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1.5px;
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.45);
-  min-width: 146px;
-  max-width: 160px;
+  min-width: 126px;
+  max-width: 142px;
+  pointer-events: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.rhythm-track-nav-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-
-.track-nav-btn {
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #fde047;
-  font-size: 11px;
-  line-height: 1;
-  padding: 3px 5px;
-  border-radius: 8px;
-  cursor: pointer;
-  touch-action: manipulation;
-  user-select: none;
-  -webkit-user-select: none;
-  transition: transform 0.1s ease, background 0.15s ease;
-}
-
-.track-nav-btn:active {
-  transform: scale(0.88);
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.rhythm-track-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  pointer-events: none;
-}
-
-.rhythm-track-hint {
-  font-size: 7.5px;
-  font-weight: 800;
-  color: #e9d5ff;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  pointer-events: none;
-  margin-top: 1px;
 }
 
 .living-option-badge {
