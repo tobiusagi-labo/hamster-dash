@@ -117,9 +117,10 @@
     }
 
     initImageLoaders() {
-      const v = '22';
+      const v = '23';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
+        player_helmet: `assets/images/player_helmet.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
         cheese: `assets/images/cheese.png?v=${v}`,
         gold: `assets/images/gold.png?v=${v}`,
@@ -155,7 +156,7 @@
     }
 
     initSoundLoaders() {
-      const v = '22';
+      const v = '23';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -5103,15 +5104,81 @@
    * Compact Top-Down Whole-Body Hamster Illustration (for gameplay & title hero)
    */
   function drawHamsterOnCtx(targetCtx, x, y, angle, isDashing, alpha = 1, scaleMult = 1, forcePoison = false, forceDizzy = false) {
-    if (assets.hasImage('player')) {
+    const isPoisoned = forcePoison || (targetCtx === ctx && playerPoisonTimer > 0);
+    const isDizzy = forceDizzy || (targetCtx === ctx && player.isDizzy);
+    const hasHelmet = targetCtx === ctx && player.hasHelmet;
+    const isEating = targetCtx === ctx && player.chewTimer > 0;
+    const imgKey = (hasHelmet && assets.hasImage('player_helmet')) ? 'player_helmet' : 'player';
+
+    if (assets.hasImage(imgKey)) {
       targetCtx.save();
       targetCtx.globalAlpha = alpha;
       targetCtx.translate(x, y);
-      targetCtx.rotate(angle);
-      const breathe = Math.sin(performance.now() * 0.008) * 0.03;
-      const s = isDashing ? 1.2 : (1 + breathe);
-      targetCtx.scale(scaleMult * s, scaleMult * (2 - s));
-      assets.drawImage(targetCtx, 'player', 0, 0, 36, 36);
+
+      // Soft ground shadow under hamster
+      if (alpha >= 0.8) {
+        targetCtx.fillStyle = isPoisoned ? 'rgba(147, 51, 234, 0.22)' : 'rgba(120, 53, 15, 0.18)';
+        targetCtx.beginPath();
+        targetCtx.ellipse(0, 3, 16 * scaleMult, 12 * scaleMult, 0, 0, Math.PI * 2);
+        targetCtx.fill();
+      }
+
+      // Rotate to movement direction.
+      // player.png has its head at 12 o'clock (UP), so rotate by angle + PI/2 to face direction of movement
+      targetCtx.rotate(angle + Math.PI / 2);
+
+      // Squish & Stretch animation
+      const breathe = Math.sin(performance.now() * 0.007) * 0.035;
+      const chewSquish = isEating ? Math.sin(performance.now() * 0.04) * 0.07 : 0;
+      let sx = scaleMult * (1 - breathe + chewSquish);
+      let sy = scaleMult * (1 + breathe);
+
+      if (isDashing) {
+        // Stretched in direction of movement (sy) and compressed sideways (sx)
+        sy = scaleMult * (isPoisoned ? 1.15 : 1.28);
+        sx = scaleMult * (isPoisoned ? 0.90 : 0.82);
+      } else if (isDizzy) {
+        sx *= 1 + Math.sin(performance.now() * 0.02) * 0.15;
+      }
+
+      targetCtx.scale(sx, sy);
+
+      // Poison tint
+      if (isPoisoned) {
+        targetCtx.filter = 'hue-rotate(90deg) brightness(1.1)';
+      }
+
+      // Draw hamster illustration (44x44px fits the 31px collision body perfectly)
+      assets.drawImage(targetCtx, imgKey, 0, 0, 44, 44);
+
+      targetCtx.filter = 'none';
+
+      // Equipped helmet protective shield aura
+      if (hasHelmet && alpha >= 0.9) {
+        const shieldPulse = 1 + Math.sin(performance.now() * 0.01) * 0.06;
+        targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.78)';
+        targetCtx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+        targetCtx.lineWidth = 2.2;
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, 24 * shieldPulse, 0, Math.PI * 2);
+        targetCtx.fill();
+        targetCtx.stroke();
+      } else if (targetCtx === ctx && player.helmetInvulnTimer > 0 && alpha >= 0.9) {
+        targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        targetCtx.lineWidth = 2.4;
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, 22, 0, Math.PI * 2);
+        targetCtx.stroke();
+      }
+
+      // Cute eating sparkle
+      if (isEating && alpha >= 0.9) {
+        targetCtx.font = '14px sans-serif';
+        targetCtx.textAlign = 'center';
+        targetCtx.textBaseline = 'middle';
+        targetCtx.fillText('✨', 16, -14);
+      }
+
       targetCtx.restore();
       return;
     }
@@ -5122,17 +5189,15 @@
     targetCtx.rotate(angle);
     targetCtx.scale(scaleMult, scaleMult);
 
-    const isPoisoned = forcePoison || (targetCtx === ctx && playerPoisonTimer > 0);
-    const isDizzy = forceDizzy || (targetCtx === ctx && player.isDizzy);
-    const breathe = Math.sin(performance.now() * 0.008) * 0.03;
     const speed = targetCtx === ctx ? Math.hypot(player.vx, player.vy) : 0;
     const isMoving = isDashing || speed > 15;
     const pawOffset = isMoving ? Math.sin(player.walkPhase) * 2.8 : Math.sin(performance.now() * 0.006) * 0.8;
+    const fbBreathe = Math.sin(performance.now() * 0.008) * 0.03;
 
     if (isDashing) {
       targetCtx.scale(isPoisoned ? 1.1 : 1.26, isPoisoned ? 0.92 : 0.82);
     } else {
-      targetCtx.scale(1 + breathe, 1 - breathe);
+      targetCtx.scale(1 + fbBreathe, 1 - fbBreathe);
     }
 
     if (alpha >= 0.99) {
@@ -6194,7 +6259,10 @@
 
     if (assets.hasImage('player')) {
       const img = assets.getImage('player');
-      timingTestCtx.drawImage(img, -18, -18, 36, 36);
+      timingTestCtx.save();
+      timingTestCtx.rotate(Math.PI / 2);
+      timingTestCtx.drawImage(img, -20, -20, 40, 40);
+      timingTestCtx.restore();
     } else {
       // Fallback cute hamster
       timingTestCtx.fillStyle = '#f59e0b';
