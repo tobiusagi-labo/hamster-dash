@@ -117,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '21';
+      const v = '22';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -155,7 +155,7 @@
     }
 
     initSoundLoaders() {
-      const v = '21';
+      const v = '22';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -1522,6 +1522,7 @@
   let currentBeatIndex = 0;
   let rhythmBeatPulse = 0;
   let rhythmTapQueue = [];
+  let beatDashedBeatIndex = -1;
 
   function getRhythmBeatInterval() {
     const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
@@ -1946,6 +1947,7 @@
     player.helmetInvulnTimer = 0.65;
     player.isDashing = false;
     rhythmTapQueue = [];
+    beatDashedBeatIndex = -1;
     screenShake = 13;
     sound.playHelmetBounce();
 
@@ -2187,6 +2189,7 @@
     currentBeatIndex = 0;
     rhythmBeatPulse = 1.0;
     rhythmTapQueue = [];
+    beatDashedBeatIndex = -1;
 
     livingBgmTimer = 0;
     livingBgmStep = 0;
@@ -2460,10 +2463,9 @@
       }
 
       const totalBeats = curTime / beatInterval;
+      const targetBeat = Math.floor(totalBeats) % RHYTHM_BEATS;
       const beatFrac = totalBeats % 1.0;
-      const phaseDiff = beatFrac > 0.5 ? beatFrac - 1.0 : beatFrac;
-      const diffMs = Math.round(phaseDiff * beatInterval * 1000);
-      const absDiff = Math.abs(diffMs);
+      const msSinceBeat = Math.round(beatFrac * beatInterval * 1000);
 
       const lastRef =
         rhythmTapQueue.length > 0
@@ -2474,17 +2476,14 @@
 
       if (dist(lastRef.x, lastRef.y, tx, ty) < 5) return;
 
-      // Just-Beat Detection Window:
-      // If player taps right on the peak of the beat (beatFrac < 0.28, i.e. 0 ~ +100ms)
-      // and has no queued backlog and isn't busy: execute IMMEDIATELY on this beat!
-      if (rhythmTapQueue.length === 0 && !player.isDashing && beatFrac < 0.28) {
+      // 予約キュー方式統一（Justbeat廃止）:
+      // ・ビート直後100ms以内(msSinceBeat <= 100)かつこの拍で未ダッシュ・キュー空なら、その拍のダッシュとして発動
+      // ・ビート直後101ms以降(msSinceBeat >= 101)は、次の拍まで待ってからダッシュする予約キューへ格納
+      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== targetBeat && !player.isDashing) {
         executeDashTo(tx, ty);
+        beatDashedBeatIndex = targetBeat;
         sound.playQueueTap(1);
-        if (absDiff <= 55) {
-          addFloatingText(player.x, player.y - 20, 'JUST BEAT! ✨', '#facc15', 15);
-        }
       } else {
-        // Queue tap for the next beat! Multiple consecutive taps execute on consecutive beats.
         rhythmTapQueue.push({ x: tx, y: ty });
         sound.playQueueTap(rhythmTapQueue.length);
       }
@@ -3435,6 +3434,7 @@
           if (rhythmTapQueue.length > 0) {
             const nextTap = rhythmTapQueue.shift();
             executeDashTo(nextTap.x, nextTap.y);
+            beatDashedBeatIndex = currentBeatIndex;
           }
         }
         rhythmTimer = targetFrac * beatInterval;
@@ -3449,6 +3449,7 @@
           if (rhythmTapQueue.length > 0) {
             const nextTap = rhythmTapQueue.shift();
             executeDashTo(nextTap.x, nextTap.y);
+            beatDashedBeatIndex = currentBeatIndex;
           }
         }
       }
@@ -7565,12 +7566,12 @@
 
     hudOscilloscopeCtx.clearRect(0, 0, cw, ch);
 
-    const isRhythm = roomType === 'rhythm';
-    const track = isRhythm
-      ? RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0]
-      : null;
-    const accentColor = track ? track.accentColor : '#f59e0b';
-    const bpm = track ? track.bpm || 160 : 120;
+    // リビングルームの場合はオシロスコープを描画しない（RHYTHM ROOM専用）
+    if (roomType !== 'rhythm') return;
+
+    const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+    const accentColor = track ? track.accentColor : '#ec4899';
+    const bpm = track ? track.bpm || 160 : 160;
     const beatInterval = 60 / bpm;
     const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
 
