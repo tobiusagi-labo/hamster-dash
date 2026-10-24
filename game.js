@@ -191,6 +191,7 @@
       shortLabel: '🍬1: KAWAII',
       fullName: 'KAWAII EDM',
       bpm: 160,
+      audioOffset: 0.0,
       accentColor: '#ec4899',
       leadWave: 'sine',
       bassWave: 'triangle',
@@ -396,7 +397,7 @@
       return this.masterGain || this.ctx.destination;
     }
 
-    playBgmFile(key, loop = true) {
+    playBgmFile(key, loop = true, startOffset = 0) {
       const aud = assets.getSound(key);
       if (!aud) {
         this.stopBgmFile();
@@ -410,7 +411,7 @@
       aud.loop = loop;
       aud.volume = Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
       try {
-        aud.currentTime = 0;
+        aud.currentTime = Math.max(0, startOffset);
         const p = aud.play();
         if (p && p.catch) {
           p.catch(() => {});
@@ -2336,9 +2337,10 @@
       return;
     }
     if (roomType === 'rhythm') {
+      const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
       const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
       if (assets.hasSound(trackKey)) {
-        sound.playBgmFile(trackKey, true);
+        sound.playBgmFile(trackKey, true, track.audioOffset || 0);
       } else {
         sound.stopBgmFile();
       }
