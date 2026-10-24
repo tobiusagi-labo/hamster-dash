@@ -117,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '25';
+      const v = '26';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -129,6 +129,7 @@
         helmet: `assets/images/helmet.png?v=${v}`,
         vacuum: `assets/images/vacuum.png?v=${v}`,
         yarn: `assets/images/yarn.png?v=${v}`,
+        toy: `assets/images/toy.png?v=${v}`,
         cat_paw: `assets/images/cat_paw.png?v=${v}`,
         cat_paw_1: `assets/images/cat_paw_1.png?v=${v}`,
         cat_paw_2: `assets/images/cat_paw_2.png?v=${v}`,
@@ -159,7 +160,7 @@
     }
 
     initSoundLoaders() {
-      const v = '25';
+      const v = '26';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -5050,7 +5051,7 @@
 
       if (obs.kind === 'yarn') {
         ctx.rotate(obs.rotation);
-        if (assets.drawImage(ctx, 'yarn', 0, 0, obs.radius * 2.2, obs.radius * 2.2)) {
+        if (assets.drawImage(ctx, 'yarn', 0, 0, obs.radius * 2.3, obs.radius * 2.3)) {
           ctx.restore();
           continue;
         }
@@ -5077,7 +5078,12 @@
         ctx.stroke();
       } else {
         const moveAng = Math.atan2(obs.vy, obs.vx);
-        ctx.rotate(moveAng);
+        ctx.rotate(moveAng + Math.PI / 2);
+        if (assets.drawImage(ctx, 'toy', 0, 0, obs.radius * 2.5, obs.radius * 2.5)) {
+          ctx.restore();
+          continue;
+        }
+        ctx.rotate(-Math.PI / 2);
 
         const tailWag = Math.sin(obs.tailPhase) * 5;
         ctx.strokeStyle = '#4c1d95';
@@ -5178,7 +5184,7 @@
 
       targetCtx.filter = 'none';
 
-      // Equipped helmet protective shield aura & cute helmet icon on head
+      // Equipped helmet protective shield aura (player image already switches to player_helmet.png)
       if (hasHelmet && alpha >= 0.9) {
         const shieldPulse = 1 + Math.sin(performance.now() * 0.01) * 0.06;
         targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.78)';
@@ -5188,13 +5194,6 @@
         targetCtx.arc(0, 0, 24 * shieldPulse, 0, Math.PI * 2);
         targetCtx.fill();
         targetCtx.stroke();
-
-        if (assets.hasImage('helmet')) {
-          targetCtx.save();
-          targetCtx.translate(0, -9);
-          assets.drawImage(targetCtx, 'helmet', 0, 0, 28, 28);
-          targetCtx.restore();
-        }
       } else if (targetCtx === ctx && player.helmetInvulnTimer > 0 && alpha >= 0.9) {
         targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
         targetCtx.lineWidth = 2.4;
