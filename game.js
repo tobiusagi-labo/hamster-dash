@@ -51,6 +51,16 @@
   const btnCloseHowto = document.getElementById('btn-close-howto');
   const btnStats = document.getElementById('btn-stats');
   const btnCloseStats = document.getElementById('btn-close-stats');
+  const btnSettings = document.getElementById('btn-settings');
+  const settingsModal = document.getElementById('settings-modal');
+  const btnCloseSettings = document.getElementById('btn-close-settings');
+  const btnSettingBgm = document.getElementById('btn-setting-bgm');
+  const btnSettingSe = document.getElementById('btn-setting-se');
+  const btnTimingMinus = document.getElementById('btn-timing-minus');
+  const btnTimingPlus = document.getElementById('btn-timing-plus');
+  const btnTimingReset = document.getElementById('btn-timing-reset');
+  const timingValDisplay = document.getElementById('timing-val-display');
+  const btnPauseSe = document.getElementById('btn-pause-se');
   const btnRetry = document.getElementById('btn-retry');
   const btnHome = document.getElementById('btn-home');
 
@@ -91,7 +101,7 @@
     }
 
     initImageLoaders() {
-      const v = '17';
+      const v = '18';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -129,7 +139,7 @@
     }
 
     initSoundLoaders() {
-      const v = '17';
+      const v = '18';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -412,7 +422,9 @@
       this.ctx = null;
       this.masterGain = null;
       this.noiseBuffer = null;
-      this.muted = false;
+      this.bgmMuted = false;
+      this.seMuted = false;
+      this.timingOffsetMs = 0;
       this.volume = 0.8;
       this.currentBgmAudio = null;
       this.currentBgmKey = null;
@@ -424,17 +436,28 @@
       this.crossfadeDuration = 1.4; // 1.4s smooth musical crossfade
       this.bgmLoopEnabled = true;
       try {
-        const savedVol = localStorage.getItem('hamster_dash_volume_v1');
-        if (savedVol !== null) {
-          const parsed = parseFloat(savedVol);
-          if (!Number.isNaN(parsed)) {
-            this.volume = Math.max(0, Math.min(1, parsed));
-          }
+        const savedBgm = localStorage.getItem('hamster_dash_bgm_muted_v2');
+        if (savedBgm !== null) this.bgmMuted = savedBgm === 'true';
+        const savedSe = localStorage.getItem('hamster_dash_se_muted_v2');
+        if (savedSe !== null) this.seMuted = savedSe === 'true';
+        const savedTiming = localStorage.getItem('hamster_dash_timing_offset_v2');
+        if (savedTiming !== null) {
+          const parsed = parseInt(savedTiming, 10);
+          if (!Number.isNaN(parsed)) this.timingOffsetMs = Math.max(-200, Math.min(200, parsed));
         }
       } catch {
         // ignore storage errors
       }
-      this.syncVolumeUI();
+      this.syncAudioUI();
+    }
+
+    get muted() {
+      return this.bgmMuted && this.seMuted;
+    }
+
+    set muted(val) {
+      this.bgmMuted = val;
+      this.seMuted = val;
     }
 
     get dest() {
@@ -442,9 +465,10 @@
     }
 
     getTargetBgmVolume() {
+      if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
       const baseRatio = isRhythm ? 0.08 : 0.16; // 全体BGM音量を現在の約20%に調整（RHYTHM: 0.40*0.2=0.08, LIVING: 0.80*0.2=0.16）
-      return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * baseRatio));
+      return Math.max(0, Math.min(1, this.volume * baseRatio));
     }
 
     playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
@@ -591,48 +615,87 @@
     }
 
     syncVolumeUI() {
-      const isOff = this.muted;
-      const icon = isOff ? '🔇' : '🔊';
-      if (soundBtn) soundBtn.textContent = icon;
+      this.syncAudioUI();
+    }
+
+    syncAudioUI() {
+      // 1. Pause Modal Controls
       if (btnPauseMute) {
-        btnPauseMute.innerHTML = isOff ? '🔇 BGM OFF' : '🔊 BGM ON';
-        btnPauseMute.classList.toggle('bgm-off', isOff);
+        btnPauseMute.innerHTML = this.bgmMuted ? '🔇 BGM OFF' : '🔊 BGM ON';
+        btnPauseMute.classList.toggle('audio-off', this.bgmMuted);
       }
+      if (btnPauseSe) {
+        btnPauseSe.innerHTML = this.seMuted ? '🔕 SE OFF' : '🔔 SE ON';
+        btnPauseSe.classList.toggle('audio-off', this.seMuted);
+      }
+
+      // 2. Settings Modal Controls
+      if (btnSettingBgm) {
+        btnSettingBgm.innerHTML = this.bgmMuted ? '🔇 OFF' : '🔊 ON';
+        btnSettingBgm.classList.toggle('btn-off', this.bgmMuted);
+      }
+      if (btnSettingSe) {
+        btnSettingSe.innerHTML = this.seMuted ? '🔕 OFF' : '🔔 ON';
+        btnSettingSe.classList.toggle('btn-off', this.seMuted);
+      }
+      if (timingValDisplay) {
+        const sign = this.timingOffsetMs > 0 ? '+' : '';
+        timingValDisplay.textContent = this.timingOffsetMs === 0 ? '0 ms (標準)' : `${sign}${this.timingOffsetMs} ms`;
+      }
+    }
+
+    toggleBgm() {
+      this.bgmMuted = !this.bgmMuted;
+      try {
+        localStorage.setItem('hamster_dash_bgm_muted_v2', String(this.bgmMuted));
+      } catch (_) {}
+      this.syncBgmVolume();
+      this.syncAudioUI();
+      if (!this.seMuted) this.playUIClick();
+    }
+
+    toggleSe() {
+      this.seMuted = !this.seMuted;
+      try {
+        localStorage.setItem('hamster_dash_se_muted_v2', String(this.seMuted));
+      } catch (_) {}
+      this.syncAudioUI();
+      if (!this.seMuted) this.playUIClick();
+    }
+
+    adjustTimingOffset(deltaMs) {
+      this.timingOffsetMs = Math.max(-200, Math.min(200, this.timingOffsetMs + deltaMs));
+      try {
+        localStorage.setItem('hamster_dash_timing_offset_v2', String(this.timingOffsetMs));
+      } catch (_) {}
+      this.syncAudioUI();
+      if (!this.seMuted) this.playUIClick();
+    }
+
+    resetTimingOffset() {
+      this.timingOffsetMs = 0;
+      try {
+        localStorage.setItem('hamster_dash_timing_offset_v2', '0');
+      } catch (_) {}
+      this.syncAudioUI();
+      if (!this.seMuted) this.playUIClick();
     }
 
     setVolume(val) {
       this.volume = Math.max(0, Math.min(1, val));
-      if (this.volume > 0 && this.muted) {
-        this.muted = false;
-      } else if (this.volume === 0) {
-        this.muted = true;
-      }
       if (this.masterGain && this.ctx) {
         this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
       }
       this.syncBgmVolume();
-      try {
-        localStorage.setItem('hamster_dash_volume_v1', String(this.volume));
-      } catch {
-        // ignore
-      }
-      this.syncVolumeUI();
+      this.syncAudioUI();
     }
 
     toggleMute() {
-      this.muted = !this.muted;
-      if (!this.muted && this.volume === 0) {
-        this.volume = 0.8;
-      }
-      if (this.masterGain && this.ctx) {
-        this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
-      }
-      this.syncBgmVolume();
-      this.syncVolumeUI();
+      this.toggleBgm();
     }
 
     playUIClick() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -648,7 +711,7 @@
     }
 
     playCountdown(step = 1) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const isGo = (step === 0 || step === true);
       const osc = this.ctx.createOscillator();
@@ -676,7 +739,7 @@
     }
 
     playDash(isPoisoned = false) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const pitchMult = isPoisoned ? 0.65 : 1.0;
 
@@ -735,7 +798,7 @@
     }
 
     playEat(combo = 1, isSpecial = false) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const baseFreq = 520 + Math.min(combo * 35, 500);
       const notes = isSpecial ? [baseFreq, baseFreq * 1.25, baseFreq * 1.5] : [baseFreq, baseFreq * 1.25];
@@ -755,7 +818,7 @@
     }
 
     playJojoBaan() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
 
       const chordFreqs = [146.83, 220, 293.66, 369.99, 440];
@@ -787,7 +850,7 @@
     }
 
     playGogogo() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const notes = [110, 98, 87.31, 73.42, 65.41];
       notes.forEach((freq, idx) => {
@@ -806,7 +869,7 @@
     }
 
     playHelmetBounce() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
 
       // Sharp metallic clang + energetic upward ricochet
@@ -836,7 +899,7 @@
     }
 
     playPoison() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const notes = [310, 260, 195, 145];
       notes.forEach((freq, idx) => {
@@ -855,7 +918,7 @@
     }
 
     playVacuumSuck() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -871,7 +934,7 @@
     }
 
     playCrash() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -899,7 +962,7 @@
     }
 
     playTimeUp(isClear = false) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const notes = isClear ? [523.25, 659.25, 783.99, 1046.5] : [440, 392, 330];
       notes.forEach((freq, idx) => {
@@ -917,7 +980,7 @@
     }
 
     playSpawnWarn() {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -936,7 +999,7 @@
      * Synthesizes a cozy, cheerful "Suika Game" style marimba/woodwind/ragtime step for LIVING ROOM
      */
     playLivingBgmStep(stepIndex) {
-      if (this.muted || !this.ctx) return;
+      if (this.bgmMuted || !this.ctx) return;
       if (assets.hasSound('living_bgm') && this.currentBgmAudio) {
         return;
       }
@@ -1011,7 +1074,7 @@
      * Richer layered drums, bass groove, chords, and lead melodies
      */
     playRhythmBeat(beatIndex, trackIdx = 0) {
-      if (this.muted || !this.ctx) return;
+      if (this.bgmMuted || !this.ctx) return;
       const trackKey = `rhythm_${(trackIdx % RHYTHM_TRACKS.length) + 1}`;
       if (assets.hasSound(trackKey) && this.currentBgmAudio) {
         return;
@@ -1127,7 +1190,7 @@
      * Layered laser whip, crisp acoustic rim body, snapping noise burst, and harmonized musical chime!
      */
     playRhythmDash(beatIndex = 0, isPoisoned = false, trackIdx = 0) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const pitchMult = isPoisoned ? 0.72 : 1.0;
       const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
@@ -1199,7 +1262,7 @@
     }
 
     playQueueTap(queueIndex = 1) {
-      if (this.muted || !this.ctx) return;
+      if (this.seMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -2507,7 +2570,14 @@
   if (btnPauseMute) {
     btnPauseMute.addEventListener('click', () => {
       sound.init();
-      sound.toggleMute();
+      sound.toggleBgm();
+    });
+  }
+
+  if (btnPauseSe) {
+    btnPauseSe.addEventListener('click', () => {
+      sound.init();
+      sound.toggleSe();
     });
   }
 
@@ -2779,6 +2849,67 @@
     sound.playUIClick();
     statsModal.classList.add('hidden');
   });
+
+  if (btnSettings) {
+    btnSettings.addEventListener('click', () => {
+      sound.init();
+      sound.playUIClick();
+      sound.syncAudioUI();
+      if (settingsModal) settingsModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnCloseSettings) {
+    btnCloseSettings.addEventListener('click', () => {
+      sound.init();
+      sound.playUIClick();
+      if (settingsModal) settingsModal.classList.add('hidden');
+    });
+  }
+
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) {
+        sound.playUIClick();
+        settingsModal.classList.add('hidden');
+      }
+    });
+  }
+
+  if (btnSettingBgm) {
+    btnSettingBgm.addEventListener('click', () => {
+      sound.init();
+      sound.toggleBgm();
+    });
+  }
+
+  if (btnSettingSe) {
+    btnSettingSe.addEventListener('click', () => {
+      sound.init();
+      sound.toggleSe();
+    });
+  }
+
+  if (btnTimingMinus) {
+    btnTimingMinus.addEventListener('click', () => {
+      sound.init();
+      sound.adjustTimingOffset(-10);
+    });
+  }
+
+  if (btnTimingPlus) {
+    btnTimingPlus.addEventListener('click', () => {
+      sound.init();
+      sound.adjustTimingOffset(10);
+    });
+  }
+
+  if (btnTimingReset) {
+    btnTimingReset.addEventListener('click', () => {
+      sound.init();
+      sound.resetTimingOffset();
+    });
+  }
 
   btnRetry.addEventListener('click', () => startGame(gameMode));
 
@@ -3085,16 +3216,37 @@
     if (roomType === 'rhythm') {
       const beatInterval = getRhythmBeatInterval();
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
-      rhythmTimer += rawDt;
-      while (rhythmTimer >= beatInterval) {
-        rhythmTimer -= beatInterval;
-        currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-        rhythmBeatPulse = 1.0;
-        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
-        if (rhythmTapQueue.length > 0) {
-          const nextTap = rhythmTapQueue.shift();
-          executeDashTo(nextTap.x, nextTap.y);
+      const aud = sound.currentBgmAudio;
+      if (aud && !aud.paused && aud.duration > 0 && state === 'PLAYING') {
+        // Hardware audio clock synchronization with user timing offset calibration!
+        const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+        const curAudTime = Math.max(0, aud.currentTime - offsetSec);
+        const totalBeats = curAudTime / beatInterval;
+        const targetBeat = Math.floor(totalBeats) % RHYTHM_BEATS;
+        const targetFrac = totalBeats % 1.0;
+
+        if (targetBeat !== currentBeatIndex) {
+          currentBeatIndex = targetBeat;
+          rhythmBeatPulse = 1.0;
+          if (rhythmTapQueue.length > 0) {
+            const nextTap = rhythmTapQueue.shift();
+            executeDashTo(nextTap.x, nextTap.y);
+          }
+        }
+        rhythmTimer = targetFrac * beatInterval;
+      } else {
+        rhythmTimer += rawDt;
+        while (rhythmTimer >= beatInterval) {
+          rhythmTimer -= beatInterval;
+          currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+          rhythmBeatPulse = 1.0;
+          sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
+
+          if (rhythmTapQueue.length > 0) {
+            const nextTap = rhythmTapQueue.shift();
+            executeDashTo(nextTap.x, nextTap.y);
+          }
         }
       }
     } else {
@@ -5240,6 +5392,9 @@
       }
       return;
     }
+
+    // Do not draw the old geometric hamster while title_mascot.png is loading
+    return;
 
     tCtx.save();
     tCtx.translate(cx, cy);

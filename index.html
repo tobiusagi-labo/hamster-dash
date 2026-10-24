@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -85,7 +85,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.4.2</div>
+          <div class="title-version-badge">ver 1.4.3</div>
         </div>
       </div>
 
@@ -135,11 +135,15 @@
             </button>
           </div>
 
-          <!-- 5. 遊び方と記録・集計 -->
+          <!-- 5. 遊び方と設定と記録・集計 -->
           <div class="hub-bottom-row">
             <button class="sub-hub-btn" id="btn-howto">
               <span class="sub-hub-icon">📖</span>
               <span class="sub-hub-text">遊び方</span>
+            </button>
+            <button class="sub-hub-btn settings-hub-btn" id="btn-settings">
+              <span class="sub-hub-icon">⚙️</span>
+              <span class="sub-hub-text">設定</span>
             </button>
             <button class="sub-hub-btn stats-hub-btn" id="btn-stats">
               <span class="sub-hub-icon">📊</span>
@@ -250,6 +254,57 @@
         </div>
       </div>
 
+      <!-- Settings Modal -->
+      <div id="settings-modal" class="overlay hidden">
+        <div class="howto-card settings-card">
+          <h3 class="howto-title">⚙️ 設定</h3>
+
+          <!-- 1. BGM & SE Independent Audio Controls -->
+          <div class="settings-section">
+            <div class="settings-section-title">🔊 サウンド設定</div>
+            
+            <div class="settings-row">
+              <div class="settings-label-group">
+                <span class="settings-label">🎵 BGM (音楽)</span>
+                <span class="settings-sub">ゲーム中の音楽</span>
+              </div>
+              <button type="button" class="settings-toggle-btn" id="btn-setting-bgm">
+                🔊 ON
+              </button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-group">
+                <span class="settings-label">🔔 効果音 (SE)</span>
+                <span class="settings-sub">ダッシュ音・エサ獲得音など</span>
+              </div>
+              <button type="button" class="settings-toggle-btn" id="btn-setting-se">
+                🔔 ON
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Rhythm Timing Calibration -->
+          <div class="settings-section">
+            <div class="settings-section-title">⏱️ リズム判定・音ズレ調整</div>
+            <p class="settings-desc">
+              Bluetoothイヤホンや端末ごとの遅延を補正できます。<br>
+              「光が早すぎる」場合は<strong>＋</strong>、「音が早すぎる」場合は<strong>−</strong>を押してください。
+            </p>
+            <div class="timing-stepper-box">
+              <button type="button" class="timing-step-btn" id="btn-timing-minus">-10ms</button>
+              <div class="timing-val-display" id="timing-val-display">0 ms (標準)</div>
+              <button type="button" class="timing-step-btn" id="btn-timing-plus">+10ms</button>
+            </div>
+            <div class="timing-reset-row">
+              <button type="button" class="timing-reset-btn" id="btn-timing-reset">初期値に戻す (0ms)</button>
+            </div>
+          </div>
+
+          <button class="primary-btn" id="btn-close-settings" style="margin-top: 14px;">とじる</button>
+        </div>
+      </div>
+
       <!-- In-Game Pause / Menu Modal -->
       <div id="pause-modal" class="overlay hidden">
         <div class="pause-card">
@@ -257,10 +312,16 @@
           <h3 class="howto-title pause-title">メニュー</h3>
 
           <div class="pause-volume-box">
-            <div class="pause-bgm-row">
-              <span class="pause-bgm-label">🎵 BGM設定</span>
-              <button type="button" class="pause-bgm-toggle-btn" id="btn-pause-mute" aria-label="BGMオンオフ">
+            <div class="pause-audio-row">
+              <span class="pause-audio-label">🎵 BGM</span>
+              <button type="button" class="pause-audio-btn" id="btn-pause-mute" aria-label="BGMオンオフ">
                 🔊 BGM ON
+              </button>
+            </div>
+            <div class="pause-audio-row" style="margin-top: 10px;">
+              <span class="pause-audio-label">🔔 効果音 (SE)</span>
+              <button type="button" class="pause-audio-btn" id="btn-pause-se" aria-label="効果音オンオフ">
+                🔔 SE ON
               </button>
             </div>
           </div>
@@ -317,6 +378,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=17"></script>
+  <script src="game.js?v=18"></script>
 </body>
 </html>
