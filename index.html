@@ -11,13 +11,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <div id="app-wrapper">
     <div id="game-container">
       <!-- Top HUD -->
       <header id="hud" class="hidden mode-survival">
+        <!-- Live Audio Oscilloscope Canvas behind score, combo, and HUD -->
+        <canvas id="hud-oscilloscope-canvas" class="hud-oscilloscope-canvas"></canvas>
         <div class="hud-top-row">
           <div class="hud-stat">
             <div class="score-box" id="score-box">
@@ -85,7 +87,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.4.4</div>
+          <div class="title-version-badge">ver 1.4.5</div>
         </div>
       </div>
 
@@ -390,6 +392,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=19"></script>
+  <script src="game.js?v=20"></script>
 </body>
 </html>

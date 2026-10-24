@@ -14,6 +14,9 @@
   const scoreValEl = document.getElementById('score-val');
   const comboBadge = document.getElementById('combo-badge');
   const comboCountEl = document.getElementById('combo-count');
+  const hudOscilloscopeCanvas = document.getElementById('hud-oscilloscope-canvas');
+  const hudOscilloscopeCtx = hudOscilloscopeCanvas ? hudOscilloscopeCanvas.getContext('2d') : null;
+  const oscWaveBuffer = new Uint8Array(256);
   const soundBtn = document.getElementById('sound-btn');
   const menuBtn = document.getElementById('menu-btn');
   const timeTextEl = document.getElementById('time-text');
@@ -114,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '19';
+      const v = '20';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -152,7 +155,7 @@
     }
 
     initSoundLoaders() {
-      const v = '19';
+      const v = '20';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -448,6 +451,10 @@
       this.crossfadeProgress = 0;
       this.crossfadeDuration = 1.4; // 1.4s smooth musical crossfade
       this.bgmLoopEnabled = true;
+      this.analyser = null;
+      this.timeData = null;
+      this.freqData = null;
+      this.mediaSources = new WeakMap();
       try {
         const savedBgm = localStorage.getItem('hamster_dash_bgm_muted_v2');
         if (savedBgm !== null) this.bgmMuted = savedBgm === 'true';
@@ -474,7 +481,7 @@
     }
 
     get dest() {
-      return this.masterGain || this.ctx.destination;
+      return this.analyser || this.masterGain || (this.ctx ? this.ctx.destination : null);
     }
 
     getTargetBgmVolume() {
@@ -521,6 +528,8 @@
       const targetVol = this.getTargetBgmVolume();
       this.playerA.volume = targetVol;
       this.playerB.volume = 0;
+      this.attachMediaElement(this.playerA);
+      if (this.playerB) this.attachMediaElement(this.playerB);
       try {
         this.playerA.currentTime = Math.max(0, startOffset);
         const p = this.playerA.play();
@@ -616,6 +625,15 @@
           this.ctx = new AudioCtx();
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.value = this.muted ? 0 : this.volume;
+
+          // Connect Oscilloscope Analyser in line with master gain
+          this.analyser = this.ctx.createAnalyser();
+          this.analyser.fftSize = 256;
+          this.analyser.smoothingTimeConstant = 0.72;
+          this.timeData = new Uint8Array(this.analyser.fftSize);
+          this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+
+          this.analyser.connect(this.masterGain);
           this.masterGain.connect(this.ctx.destination);
 
           // Pre-build short white-noise buffer for Rimshot / K-Snare percussion
@@ -630,6 +648,37 @@
       }
       if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume();
+      }
+    }
+
+    attachMediaElement(audioEl) {
+      if (!this.ctx || !this.analyser || !audioEl) return;
+      if (this.mediaSources.has(audioEl)) return;
+      try {
+        audioEl.crossOrigin = 'anonymous';
+        const srcNode = this.ctx.createMediaElementSource(audioEl);
+        srcNode.connect(this.analyser);
+        this.mediaSources.set(audioEl, srcNode);
+      } catch (_) {
+        // Silently catch if CORS restricts createMediaElementSource on local file:// or already connected
+      }
+    }
+
+    getAudioWaveData(targetArray) {
+      if (!this.analyser || !this.timeData) return false;
+      try {
+        this.analyser.getByteTimeDomainData(this.timeData);
+        let maxDev = 0;
+        for (let i = 0; i < this.timeData.length; i += 4) {
+          const dev = Math.abs(this.timeData[i] - 128);
+          if (dev > maxDev) maxDev = dev;
+        }
+        if (targetArray) {
+          targetArray.set(this.timeData);
+        }
+        return maxDev > 2;
+      } catch (_) {
+        return false;
       }
     }
 
@@ -1585,6 +1634,16 @@
       canvas.height = newCanvasH;
     }
 
+    if (hudOscilloscopeCanvas) {
+      const hRect = hudOscilloscopeCanvas.getBoundingClientRect();
+      const hw = Math.round((hRect.width || displayW) * dpr);
+      const hh = Math.round((hRect.height || 52) * dpr);
+      if (hudOscilloscopeCanvas.width !== hw || hudOscilloscopeCanvas.height !== hh) {
+        hudOscilloscopeCanvas.width = hw;
+        hudOscilloscopeCanvas.height = hh;
+      }
+    }
+
     viewScaleX = displayW / VIRTUAL_WIDTH;
     viewScaleY = displayH / VIRTUAL_HEIGHT;
     width = VIRTUAL_WIDTH;
@@ -2404,7 +2463,22 @@
     const ty = clamp(rawY, HUD_TOP_MARGIN + WALL_PADDING, height - WALL_PADDING);
 
     if (roomType === 'rhythm') {
-      // Queue tap for the next beat! Multiple consecutive taps execute on consecutive beats.
+      const beatInterval = getRhythmBeatInterval();
+      const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+      let curTime = 0;
+      const aud = sound.currentBgmAudio;
+      if (aud && !aud.paused && aud.duration > 0) {
+        curTime = Math.max(0, aud.currentTime - offsetSec);
+      } else {
+        curTime = Math.max(0, (performance.now() * 0.001) - offsetSec);
+      }
+
+      const totalBeats = curTime / beatInterval;
+      const beatFrac = totalBeats % 1.0;
+      const phaseDiff = beatFrac > 0.5 ? beatFrac - 1.0 : beatFrac;
+      const diffMs = Math.round(phaseDiff * beatInterval * 1000);
+      const absDiff = Math.abs(diffMs);
+
       const lastRef =
         rhythmTapQueue.length > 0
           ? rhythmTapQueue[rhythmTapQueue.length - 1]
@@ -2414,8 +2488,20 @@
 
       if (dist(lastRef.x, lastRef.y, tx, ty) < 5) return;
 
-      rhythmTapQueue.push({ x: tx, y: ty });
-      sound.playQueueTap(rhythmTapQueue.length);
+      // Just-Beat Detection Window:
+      // If player taps right on the peak of the beat (beatFrac < 0.28, i.e. 0 ~ +100ms)
+      // and has no queued backlog and isn't busy: execute IMMEDIATELY on this beat!
+      if (rhythmTapQueue.length === 0 && !player.isDashing && beatFrac < 0.28) {
+        executeDashTo(tx, ty);
+        sound.playQueueTap(1);
+        if (absDiff <= 55) {
+          addFloatingText(player.x, player.y - 20, 'JUST BEAT! ✨', '#facc15', 15);
+        }
+      } else {
+        // Queue tap for the next beat! Multiple consecutive taps execute on consecutive beats.
+        rhythmTapQueue.push({ x: tx, y: ty });
+        sound.playQueueTap(rhythmTapQueue.length);
+      }
     } else {
       // LIVING ROOM: Immediate high-speed linear dash
       executeDashTo(tx, ty);
@@ -7479,6 +7565,126 @@
     ctx.restore();
   }
 
+  // --- Faint Glowing Audio Oscilloscope (Behind Score & Combo HUD) ---
+  function drawHudOscilloscope(now, dt) {
+    if (!hudOscilloscopeCanvas || !hudOscilloscopeCtx) return;
+    if (state !== 'PLAYING' && state !== 'COUNTDOWN' && state !== 'DYING') {
+      hudOscilloscopeCtx.clearRect(0, 0, hudOscilloscopeCanvas.width, hudOscilloscopeCanvas.height);
+      return;
+    }
+
+    const cw = hudOscilloscopeCanvas.width;
+    const ch = hudOscilloscopeCanvas.height;
+    if (cw === 0 || ch === 0) return;
+
+    hudOscilloscopeCtx.clearRect(0, 0, cw, ch);
+
+    const isRhythm = roomType === 'rhythm';
+    const track = isRhythm
+      ? RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0]
+      : null;
+    const accentColor = track ? track.accentColor : '#f59e0b';
+    const bpm = track ? track.bpm || 160 : 120;
+    const beatInterval = 60 / bpm;
+    const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+
+    let curTime = 0;
+    const aud = sound.currentBgmAudio;
+    if (aud && !aud.paused && aud.duration > 0) {
+      curTime = Math.max(0, aud.currentTime - offsetSec);
+    } else {
+      curTime = Math.max(0, (now * 0.001) - offsetSec);
+    }
+
+    const totalBeats = curTime / beatInterval;
+    const beatPhase = totalBeats % 1.0;
+    const midY = ch * 0.52;
+
+    // 1. Subtle horizontal dashed guideline across header
+    hudOscilloscopeCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+    hudOscilloscopeCtx.lineWidth = 1;
+    hudOscilloscopeCtx.setLineDash([3, 4]);
+    hudOscilloscopeCtx.beginPath();
+    hudOscilloscopeCtx.moveTo(8, midY);
+    hudOscilloscopeCtx.lineTo(cw - 8, midY);
+    hudOscilloscopeCtx.stroke();
+    hudOscilloscopeCtx.setLineDash([]);
+
+    // 2. Sample from Web Audio Analyser or fallback to Harmonic Rhythmic Wave
+    const hasRealAudio = sound.getAudioWaveData(oscWaveBuffer);
+    const numPoints = 80;
+    const points = [];
+
+    // Strong beat kick envelope (peaks when beatPhase is near 0.0)
+    const distToBeat = beatPhase > 0.5 ? 1.0 - beatPhase : beatPhase;
+    const beatKickAmp = Math.max(0, 1.0 - distToBeat * 4.8); // 1.0 at beat peak, sharp decay
+
+    for (let i = 0; i < numPoints; i++) {
+      const px = (i / (numPoints - 1)) * cw;
+      let dev = 0;
+
+      if (hasRealAudio) {
+        const bufIdx = Math.floor((i / numPoints) * oscWaveBuffer.length);
+        const sample = (oscWaveBuffer[bufIdx] - 128) / 128; // -1.0 to 1.0
+        dev = sample * (1.1 + beatKickAmp * 0.45);
+      } else {
+        // Procedural rhythmic oscilloscope wave
+        const wave1 = Math.sin((px * 0.035) - (totalBeats * Math.PI * 2));
+        const wave2 = Math.sin((px * 0.075) + (now * 0.008)) * 0.32;
+        const centerDist = Math.abs(px - cw * 0.5) / (cw * 0.30);
+        const centerBell = Math.exp(-centerDist * centerDist);
+        const kickTransient = beatKickAmp * centerBell * Math.sin(px * 0.12 - beatPhase * Math.PI * 4);
+
+        dev = (wave1 * 0.35 + wave2 + kickTransient * 0.82);
+      }
+
+      const py = midY + clamp(dev, -1.2, 1.2) * (ch * 0.40);
+      points.push({ x: px, y: py });
+    }
+
+    // 3. Faint Ambient Glow Wave (Atmospheric Neon Aura)
+    hudOscilloscopeCtx.save();
+    hudOscilloscopeCtx.beginPath();
+    hudOscilloscopeCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      hudOscilloscopeCtx.lineTo(points[i].x, points[i].y);
+    }
+    hudOscilloscopeCtx.strokeStyle = hexToRgba(accentColor, 0.28 + rhythmBeatPulse * 0.22);
+    hudOscilloscopeCtx.lineWidth = 3.6;
+    hudOscilloscopeCtx.shadowColor = accentColor;
+    hudOscilloscopeCtx.shadowBlur = 8 + rhythmBeatPulse * 8;
+    hudOscilloscopeCtx.stroke();
+    hudOscilloscopeCtx.restore();
+
+    // 4. Crisp Core Neon Wave Line
+    hudOscilloscopeCtx.save();
+    hudOscilloscopeCtx.beginPath();
+    hudOscilloscopeCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      hudOscilloscopeCtx.lineTo(points[i].x, points[i].y);
+    }
+    hudOscilloscopeCtx.strokeStyle = hexToRgba('#ffffff', 0.65 + rhythmBeatPulse * 0.30);
+    hudOscilloscopeCtx.lineWidth = 1.4;
+    hudOscilloscopeCtx.stroke();
+    hudOscilloscopeCtx.restore();
+
+    // 5. Center Reticle & Beat Pulse Ring (Directly behind/around combo badge)
+    const centerX = cw * 0.5;
+    if (rhythmBeatPulse > 0.06) {
+      hudOscilloscopeCtx.save();
+      const ringR = 8 + (1.0 - rhythmBeatPulse) * 20;
+      const ringAlpha = rhythmBeatPulse * 0.45;
+      hudOscilloscopeCtx.strokeStyle = hexToRgba(accentColor, ringAlpha);
+      hudOscilloscopeCtx.lineWidth = 2.0;
+      hudOscilloscopeCtx.shadowColor = accentColor;
+      hudOscilloscopeCtx.shadowBlur = 6;
+      hudOscilloscopeCtx.beginPath();
+      hudOscilloscopeCtx.arc(centerX, midY, ringR, 0, Math.PI * 2);
+      hudOscilloscopeCtx.stroke();
+      hudOscilloscopeCtx.restore();
+    }
+  }
+
   // --- Main Animation Loop ---
   let lastTime = performance.now();
   function loop(now) {
@@ -7489,6 +7695,7 @@
     update(dt);
     render();
     renderMenuCanvases(now, dt);
+    drawHudOscilloscope(now, dt);
 
     requestAnimationFrame(loop);
   }
