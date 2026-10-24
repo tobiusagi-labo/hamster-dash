@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=11" />
+  <link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -139,11 +139,11 @@
 
           <!-- Room Switcher Button at the bottom of Mode Select -->
           <div class="hub-room-switch-row">
-            <button class="room-switch-btn" id="btn-room-toggle" type="button">
-              <span class="room-switch-pill active" id="pill-living">🏠 LIVINGROOM</span>
+            <div class="room-switch-btn" id="btn-room-toggle">
+              <button class="room-switch-pill active" id="pill-living" type="button">🏠 LIVINGROOM</button>
               <span class="room-switch-arrow">⇄</span>
-              <span class="room-switch-pill" id="pill-rhythm">🎵 RHYTHMROOM</span>
-            </button>
+              <button class="room-switch-pill" id="pill-rhythm" type="button">🎵 RHYTHMROOM</button>
+            </div>
           </div>
         </div>
       </div>
@@ -327,6 +327,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=11"></script>
+  <script src="game.js?v=12"></script>
 </body>
 </html>

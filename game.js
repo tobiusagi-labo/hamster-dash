@@ -470,46 +470,48 @@
     }
 
     updateBgmLoop(dt) {
-      if (!this.bgmLoopEnabled || !this.currentBgmKey) return;
-      const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
-      const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
-      if (!active || !active.duration || active.paused) return;
+      try {
+        if (!this.bgmLoopEnabled || !this.currentBgmKey) return;
+        const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
+        const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
+        if (!active || !active.duration || active.paused) return;
 
-      const dur = active.duration;
-      const cur = active.currentTime;
-      const triggerTime = Math.max(0, dur - this.crossfadeDuration);
+        const dur = active.duration;
+        const cur = active.currentTime;
+        const triggerTime = Math.max(0, dur - this.crossfadeDuration);
 
-      if (!this.crossfading && cur >= triggerTime && cur < dur) {
-        this.crossfading = true;
-        this.crossfadeProgress = 0;
-        try {
-          standby.currentTime = 0;
-          standby.volume = 0;
-          const p = standby.play();
-          if (p && p.catch) p.catch(() => {});
-        } catch (_) {}
-      }
-
-      if (this.crossfading) {
-        this.crossfadeProgress += dt / this.crossfadeDuration;
-        const targetVol = this.getTargetBgmVolume();
-        const p = Math.max(0, Math.min(1, this.crossfadeProgress));
-
-        active.volume = targetVol * (1 - p);
-        standby.volume = targetVol * p;
-
-        if (p >= 1.0 || active.ended) {
-          try {
-            active.pause();
-            active.currentTime = 0;
-          } catch (_) {}
-          this.activeSlot = this.activeSlot === 'a' ? 'b' : 'a';
-          this.currentBgmAudio = standby;
-          standby.volume = targetVol;
-          this.crossfading = false;
+        if (!this.crossfading && cur >= triggerTime && cur < dur && standby) {
+          this.crossfading = true;
           this.crossfadeProgress = 0;
+          try {
+            standby.currentTime = 0;
+            standby.volume = 0;
+            const p = standby.play();
+            if (p && p.catch) p.catch(() => {});
+          } catch (_) {}
         }
-      }
+
+        if (this.crossfading && standby) {
+          this.crossfadeProgress += dt / this.crossfadeDuration;
+          const targetVol = this.getTargetBgmVolume();
+          const p = Math.max(0, Math.min(1, this.crossfadeProgress));
+
+          active.volume = Math.max(0, Math.min(1, targetVol * (1 - p)));
+          standby.volume = Math.max(0, Math.min(1, targetVol * p));
+
+          if (p >= 1.0 || active.ended) {
+            try {
+              active.pause();
+              active.currentTime = 0;
+            } catch (_) {}
+            this.activeSlot = this.activeSlot === 'a' ? 'b' : 'a';
+            this.currentBgmAudio = standby;
+            standby.volume = Math.max(0, Math.min(1, targetVol));
+            this.crossfading = false;
+            this.crossfadeProgress = 0;
+          }
+        }
+      } catch (_) {}
     }
 
     stopBgmFile() {
@@ -525,6 +527,7 @@
           this.playerB.currentTime = 0;
         } catch (_) {}
       }
+      this.activeSlot = 'a';
       this.currentBgmAudio = null;
       this.currentBgmKey = null;
       this.crossfading = false;
@@ -684,7 +687,10 @@
         filter.frequency.setValueAtTime(1600 * pitchMult, now);
         filter.frequency.exponentialRampToValueAtTime(3200 * pitchMult, now + 0.035);
         filter.frequency.exponentialRampToValueAtTime(800 * pitchMult, now + 0.11);
-        filter.Q.setValueAtTime(2.2, now);
+        if (filter.Q) {
+          if (filter.Q.setValueAtTime) filter.Q.setValueAtTime(2.2, now);
+          else filter.Q.value = 2.2;
+        }
         const nGain = this.ctx.createGain();
         nGain.gain.setValueAtTime(0.32, now);
         nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.115);
@@ -1140,7 +1146,10 @@
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'bandpass';
         filter.frequency.setValueAtTime(isPoisoned ? 1400 : 2600, now);
-        filter.Q.setValueAtTime(2.0, now);
+        if (filter.Q) {
+          if (filter.Q.setValueAtTime) filter.Q.setValueAtTime(2.0, now);
+          else filter.Q.value = 2.0;
+        }
         const nGain = this.ctx.createGain();
         nGain.gain.setValueAtTime(0.40, now);
         nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
@@ -2062,14 +2071,6 @@
     baanCutIn = null;
     zugyaanCutIn = null;
 
-    rhythmTimer = 0;
-    currentBeatIndex = 0;
-    rhythmBeatPulse = 0;
-    rhythmTapQueue = [];
-
-    livingBgmTimer = 0;
-    livingBgmStep = 0;
-
     // Reset Cat Paw Hazard
     catPaw.active = false;
     catPaw.state = 'idle';
@@ -2509,8 +2510,9 @@
     });
   }
 
-  btnSurvival.addEventListener('click', () => startGame('survival'));
-  btnTimeattack.addEventListener('click', () => startGame('timeattack'));
+  // Mode Select Direct Instant Triggers
+  bindInstantTrigger(btnSurvival, () => startGame('survival'));
+  bindInstantTrigger(btnTimeattack, () => startGame('timeattack'));
 
   // Central BGM Sync Controller for Audio Files & Procedural Fallbacks
   function syncRoomBgm(forceRestart = false) {
@@ -2536,7 +2538,7 @@
     }
   }
 
-  // Room Toggle Button: Switch between LIVINGROOM and RHYTHMROOM
+  // Room Toggle & Switch: Switch between LIVINGROOM and RHYTHMROOM
   function updateRoomSwitchUI() {
     if (!hubCard) return;
     const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
@@ -2548,8 +2550,14 @@
       if (hubSubText) {
         hubSubText.innerHTML = 'リズムに合わせて高速移動‼ <span class="rhythm-sound-note">※音あり推奨</span>';
       }
-      if (pillLiving) pillLiving.classList.remove('active');
-      if (pillRhythm) pillRhythm.classList.add('active');
+      if (pillLiving) {
+        pillLiving.classList.remove('active');
+        pillLiving.setAttribute('aria-selected', 'false');
+      }
+      if (pillRhythm) {
+        pillRhythm.classList.add('active');
+        pillRhythm.setAttribute('aria-selected', 'true');
+      }
       if (rhythmTrackBadge) {
         rhythmTrackBadge.classList.remove('hidden');
         rhythmTrackBadge.style.borderColor = track.accentColor;
@@ -2565,8 +2573,14 @@
       else if (livingOption === 'ice') livingTitle = '🏠 LIVING ROOM (Ice+)';
       if (roomCurrentBadge) roomCurrentBadge.textContent = livingTitle;
       if (hubSubText) hubSubText.textContent = '画面タップの位置に高速移動！';
-      if (pillLiving) pillLiving.classList.add('active');
-      if (pillRhythm) pillRhythm.classList.remove('active');
+      if (pillLiving) {
+        pillLiving.classList.add('active');
+        pillLiving.setAttribute('aria-selected', 'true');
+      }
+      if (pillRhythm) {
+        pillRhythm.classList.remove('active');
+        pillRhythm.setAttribute('aria-selected', 'false');
+      }
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
 
       if (livingOptionBadge) {
@@ -2584,32 +2598,50 @@
     }
   }
 
-  if (btnRoomToggle) {
-    btnRoomToggle.addEventListener('click', () => {
-      sound.init();
+  function switchRoom(targetType) {
+    sound.init();
+    if (targetType === 'toggle') {
       roomType = roomType === 'living' ? 'rhythm' : 'living';
-      clearTrackPreview();
-      if (roomType === 'rhythm') {
-        rhythmTimer = 0;
-        currentBeatIndex = 0;
-        sound.playRhythmBeat(0, rhythmTrackIndex);
-      } else {
-        sound.playUIClick();
-        livingBgmTimer = 0;
-        livingBgmStep = 0;
-        sound.playLivingBgmStep(0);
+    } else if (roomType !== targetType) {
+      roomType = targetType;
+    } else {
+      return; // Already active, no duplicate flip
+    }
+    clearTrackPreview();
+    if (roomType === 'rhythm') {
+      rhythmTimer = 0;
+      currentBeatIndex = 0;
+      sound.playRhythmBeat(0, rhythmTrackIndex);
+    } else {
+      sound.playUIClick();
+      livingBgmTimer = 0;
+      livingBgmStep = 0;
+      sound.playLivingBgmStep(0);
+    }
+    updateRoomSwitchUI();
+    syncRoomBgm();
+  }
+
+  if (pillLiving) {
+    bindInstantTrigger(pillLiving, () => switchRoom('living'));
+  }
+  if (pillRhythm) {
+    bindInstantTrigger(pillRhythm, () => switchRoom('rhythm'));
+  }
+  if (btnRoomToggle) {
+    btnRoomToggle.addEventListener('click', (e) => {
+      // Toggle if clicking container background or arrow directly
+      if (e.target === btnRoomToggle || (e.target && e.target.classList.contains('room-switch-arrow'))) {
+        switchRoom('toggle');
       }
-      updateRoomSwitchUI();
-      syncRoomBgm();
     });
   }
 
   // Center Hamster Tap in Mode Select:
-  // - RHYTHM: Switch between 6 tracks
+  // - RHYTHM: Switch between 6 tracks with dynamic accessory change
   // - LIVING: 5 taps cycle through 'none' -> 'cat' -> 'ice' -> 'none'
   if (hubCenterHamster) {
-    hubCenterHamster.addEventListener('click', (e) => {
-      e.stopPropagation();
+    bindInstantTrigger(hubCenterHamster, () => {
       sound.init();
       if (roomType === 'rhythm') {
         rhythmTrackIndex = (rhythmTrackIndex + 1) % RHYTHM_TRACKS.length;
@@ -2851,7 +2883,7 @@
         f.bobPhase += rawDt * 3;
       }
 
-      const beatInterval = roomType === 'rhythm' ? getRhythmBeatInterval() : 0.45;
+      const beatInterval = Math.max(0.2, roomType === 'rhythm' ? getRhythmBeatInterval() : 0.45);
 
       // Tick rhythm timer and beat animations during countdown!
       if (roomType === 'rhythm') {
@@ -2863,7 +2895,7 @@
         }
       }
 
-      countdownTimer -= rawDt / beatInterval;
+      countdownTimer = Math.max(0, countdownTimer - rawDt / beatInterval);
       const currentSec = Math.ceil(countdownTimer);
       if (currentSec < lastCountdownBeep && currentSec >= 1) {
         lastCountdownBeep = currentSec;
@@ -4899,45 +4931,546 @@
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
-      hCtx.restore();
-      return;
-    }
 
-    // Custom hub standing hamster image override for RHYTHM ROOM
-    if (roomType === 'rhythm' && assets.hasImage('hub_hamster_rhythm')) {
-      const img = assets.getImage('hub_hamster_rhythm');
-      let dw = 140;
-      let dh = 148;
-      if (img && img.naturalWidth && img.naturalHeight) {
-        const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 150;
-        dw = dh * aspect;
-        if (dw > 146) {
-          dw = 146;
-          dh = dw / aspect;
-        }
+      // Living Room Secret Option Enhancements:
+      if (livingOption === 'cat') {
+        // Cute playful cat paw badge and ears
+        hCtx.font = '18px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        const pawBob = Math.sin(now * 0.008) * 3;
+        hCtx.fillText('🐾', 46, -38 + pawBob);
+      } else if (livingOption === 'ice') {
+        // Frosty winter sparkles and snowflakes
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        const iceBob = Math.sin(now * 0.007) * 3;
+        hCtx.fillText('❄️', 46, -38 + iceBob);
+        hCtx.fillText('✨', -46, -36 - iceBob);
       }
 
-      // Soft ground shadow under disco stance
-      hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
-      hCtx.beginPath();
-      hCtx.ellipse(0, 62 - bounce * 0.35, 46, 10, 0, 0, Math.PI * 2);
-      hCtx.fill();
-
-      // Floating musical notes around the disco hamster
-      const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
-      hCtx.fillStyle = track ? track.accentColor : '#d946ef';
-      hCtx.font = '900 16px sans-serif';
-      hCtx.textAlign = 'center';
-      const noteY = Math.sin(now * 0.009) * 4;
-      hCtx.fillText('♪', 52, -46 + noteY);
-      hCtx.fillText('♫', -52, -44 - noteY);
-
-      assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, dw, dh);
       hCtx.restore();
       return;
     }
 
+    // Dynamic Multi-Track Costume & DJ Accessories System for RHYTHM ROOM
+    if (roomType === 'rhythm') {
+      const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+      const accent = track.accentColor || '#ec4899';
+      const bpm = track.bpm || 160;
+
+      // 1. Dynamic BPM-Synchronized Disco Floor Underglow
+      const beatCycle = (now * 0.001 * (bpm / 60) * Math.PI * 2) % (Math.PI * 2);
+      const discoPulse = Math.pow(Math.sin(beatCycle * 0.5), 2);
+      const floorR = 48 + discoPulse * 16;
+
+      // Outer glowing disco halo
+      const discoGrad = hCtx.createRadialGradient(0, 58, 10, 0, 58, floorR);
+      discoGrad.addColorStop(0, hexToRgba(accent, 0.45 + discoPulse * 0.35));
+      discoGrad.addColorStop(0.65, hexToRgba(accent, 0.18 + discoPulse * 0.2));
+      discoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      hCtx.fillStyle = discoGrad;
+      hCtx.beginPath();
+      hCtx.ellipse(0, 58 - bounce * 0.3, floorR, floorR * 0.32, 0, 0, Math.PI * 2);
+      hCtx.fill();
+
+      // Sharp glowing perimeter ring on the disco floor
+      hCtx.strokeStyle = hexToRgba(accent, 0.75 + discoPulse * 0.25);
+      hCtx.lineWidth = 2.2;
+      hCtx.beginPath();
+      hCtx.ellipse(0, 58 - bounce * 0.3, 38 + discoPulse * 8, (38 + discoPulse * 8) * 0.28, 0, 0, Math.PI * 2);
+      hCtx.stroke();
+
+      // Soft ground contact shadow
+      hCtx.fillStyle = 'rgba(20, 5, 35, 0.38)';
+      hCtx.beginPath();
+      hCtx.ellipse(0, 60 - bounce * 0.35, 36, 8.5, 0, 0, Math.PI * 2);
+      hCtx.fill();
+
+      // 2. Base DJ Hamster Mascot Graphic
+      let hamsterW = 140;
+      let hamsterH = 148;
+      if (assets.hasImage('hub_hamster_rhythm')) {
+        const img = assets.getImage('hub_hamster_rhythm');
+        if (img && img.naturalWidth && img.naturalHeight) {
+          const aspect = img.naturalWidth / img.naturalHeight;
+          hamsterH = 150;
+          hamsterW = hamsterH * aspect;
+          if (hamsterW > 146) {
+            hamsterW = 146;
+            hamsterH = hamsterW / aspect;
+          }
+        }
+        assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, hamsterW, hamsterH);
+      } else {
+        // Fallback procedural DJ hamster body if image is not loaded
+        drawProceduralStandingHamsterBody(hCtx, now, bounce);
+      }
+
+      // 3. Track-Specific Custom Wear & Accessories Transformation!
+      drawTrackSpecificAccessories(hCtx, rhythmTrackIndex % RHYTHM_TRACKS.length, track, now, discoPulse);
+
+      hCtx.restore();
+      return;
+    }
+
+    // Default Fallback Standing Hamster Body for Living Room
+    drawProceduralStandingHamsterBody(hCtx, now, bounce);
+
+    hCtx.restore();
+  }
+
+  function drawSmallHeart(ctx, hx, hy, size) {
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.bezierCurveTo(hx - size / 2, hy - size / 2, hx - size, hy + size / 3, hx, hy + size);
+    ctx.bezierCurveTo(hx + size, hy + size / 3, hx + size / 2, hy - size / 2, hx, hy);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function drawTrackSpecificAccessories(hCtx, trackIdx, track, now, discoPulse) {
+    const accent = track.accentColor || '#ec4899';
+    hCtx.save();
+
+    switch (trackIdx) {
+      case 0: { // 🍬 1: KAWAII EDM (Pink / Cute / Candy / Hearts)
+        // 1. Glowing Pink Cat-Ear DJ Headphones
+        hCtx.strokeStyle = '#db2777';
+        hCtx.lineWidth = 3.6;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 23, -Math.PI * 0.9, -Math.PI * 0.1);
+        hCtx.stroke();
+
+        // Neon Cat Ears on top of headband
+        hCtx.fillStyle = '#f472b6';
+        hCtx.strokeStyle = '#db2777';
+        hCtx.lineWidth = 2;
+        // Left Ear
+        hCtx.beginPath();
+        hCtx.moveTo(-16, -32);
+        hCtx.lineTo(-24, -46);
+        hCtx.lineTo(-8, -35);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+        // Right Ear
+        hCtx.beginPath();
+        hCtx.moveTo(16, -32);
+        hCtx.lineTo(24, -46);
+        hCtx.lineTo(8, -35);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Inner glowing ear pink
+        hCtx.fillStyle = '#fdf2f8';
+        hCtx.beginPath();
+        hCtx.moveTo(-16, -33);
+        hCtx.lineTo(-21, -42);
+        hCtx.lineTo(-10, -35);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.beginPath();
+        hCtx.moveTo(16, -33);
+        hCtx.lineTo(21, -42);
+        hCtx.lineTo(10, -35);
+        hCtx.closePath();
+        hCtx.fill();
+
+        // Chunky circular earcups with pulsing glowing hearts
+        hCtx.fillStyle = '#ec4899';
+        hCtx.strokeStyle = '#9d174d';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.ellipse(-23, -14, 6, 9.5, -0.1, 0, Math.PI * 2);
+        hCtx.ellipse(23, -14, 6, 9.5, 0.1, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Ear cup center heart
+        hCtx.fillStyle = '#ffffff';
+        hCtx.font = '900 8px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('♥', -23, -14);
+        hCtx.fillText('♥', 23, -14);
+
+        // 2. Cute Idol Heart-Shaped Sunglasses
+        hCtx.save();
+        hCtx.fillStyle = 'rgba(244, 63, 94, 0.88)';
+        hCtx.strokeStyle = '#fb7185';
+        hCtx.lineWidth = 1.6;
+        // Left Heart Lens
+        drawSmallHeart(hCtx, -9, -15, 6.2);
+        // Right Heart Lens
+        drawSmallHeart(hCtx, 9, -15, 6.2);
+        // Gold Bridge
+        hCtx.strokeStyle = '#facc15';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.moveTo(-3, -16);
+        hCtx.lineTo(3, -16);
+        hCtx.stroke();
+        // Cute sparkle glints
+        hCtx.fillStyle = '#ffffff';
+        hCtx.font = '900 7px sans-serif';
+        hCtx.fillText('✦', -10, -18);
+        hCtx.fillText('✦', 8, -18);
+        hCtx.restore();
+
+        // 3. Floating Candy & Music Notes
+        const noteBob = Math.sin(now * 0.009) * 4;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('🍬', 48, -42 + noteBob);
+        hCtx.fillText('💖', -48, -40 - noteBob);
+        hCtx.fillStyle = '#ec4899';
+        hCtx.font = '900 16px sans-serif';
+        hCtx.fillText('♪', 52, 6 - noteBob);
+        hCtx.fillText('♫', -52, 8 + noteBob);
+        break;
+      }
+
+      case 1: { // 🏎️ 2: EUROBEAT RACER (Orange / Flames / Speed / Racing)
+        // 1. Fiery Aerodynamic Mirror Wrap Sunglasses
+        hCtx.save();
+        const visorGrad = hCtx.createLinearGradient(-22, -18, 22, -10);
+        visorGrad.addColorStop(0, '#ea580c');
+        visorGrad.addColorStop(0.5, '#facc15');
+        visorGrad.addColorStop(1, '#ea580c');
+        hCtx.fillStyle = visorGrad;
+        hCtx.strokeStyle = '#7c2d12';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.moveTo(-22, -19);
+        hCtx.lineTo(22, -19);
+        hCtx.lineTo(18, -11);
+        hCtx.quadraticCurveTo(0, -9, -18, -11);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+
+        // High-speed diagonal twin glare reflections
+        hCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        hCtx.lineWidth = 2;
+        hCtx.lineCap = 'round';
+        hCtx.beginPath();
+        hCtx.moveTo(-14, -13);
+        hCtx.lineTo(-8, -18);
+        hCtx.moveTo(4, -13);
+        hCtx.lineTo(10, -18);
+        hCtx.stroke();
+        hCtx.restore();
+
+        // 2. Sport Racing Headset with Checkered Stripes
+        hCtx.strokeStyle = '#c2410c';
+        hCtx.lineWidth = 3.6;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 23.5, -Math.PI * 0.88, -Math.PI * 0.12);
+        hCtx.stroke();
+
+        hCtx.fillStyle = '#f97316';
+        hCtx.strokeStyle = '#7c2d12';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.ellipse(-23, -14, 6.5, 9, -0.15, 0, Math.PI * 2);
+        hCtx.ellipse(23, -14, 6.5, 9, 0.15, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // White checkered race marks on ear cups
+        hCtx.fillStyle = '#ffffff';
+        hCtx.fillRect(-25, -16, 3, 4);
+        hCtx.fillRect(22, -16, 3, 4);
+
+        // 3. Floating Turbo Flames & Racing Flags
+        const floatBob = Math.sin(now * 0.011) * 4;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('🏎️', 48, -42 + floatBob);
+        hCtx.fillText('🔥', -48, -40 - floatBob);
+        hCtx.fillText('⚡', 52, 6 - floatBob);
+        hCtx.fillText('🏁', -52, 8 + floatBob);
+        break;
+      }
+
+      case 2: { // ⚡ 3: CYBER TECHNO (Cyan / Electric / Future)
+        // 1. Futuristic Glowing Cyber Visor with Animated Scanline HUD
+        hCtx.save();
+        hCtx.fillStyle = 'rgba(6, 182, 212, 0.35)';
+        hCtx.strokeStyle = '#06b6d4';
+        hCtx.lineWidth = 2.2;
+        roundRect(hCtx, -21, -19, 42, 11, 3);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Moving animated cyan scanline HUD
+        const scanY = -18 + ((now * 0.02) % 9);
+        hCtx.strokeStyle = '#a5f3fc';
+        hCtx.lineWidth = 1.8;
+        hCtx.beginPath();
+        hCtx.moveTo(-19, scanY);
+        hCtx.lineTo(19, scanY);
+        hCtx.stroke();
+
+        // Digital HUD tech dots
+        hCtx.fillStyle = '#ecfeff';
+        hCtx.font = '900 6.5px monospace';
+        hCtx.fillText('01', -16, -11);
+        hCtx.fillText('SYS', 8, -11);
+        hCtx.restore();
+
+        // 2. Cyberpunk Antenna DJ Headset
+        hCtx.strokeStyle = '#0891b2';
+        hCtx.lineWidth = 3.6;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 23.5, -Math.PI * 0.88, -Math.PI * 0.12);
+        hCtx.stroke();
+
+        // Tech Antenna on left earcup
+        hCtx.strokeStyle = '#22d3ee';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.moveTo(-23, -18);
+        hCtx.lineTo(-27, -36);
+        hCtx.stroke();
+        hCtx.fillStyle = '#67e8f9';
+        hCtx.beginPath();
+        hCtx.arc(-27, -36, 3, 0, Math.PI * 2);
+        hCtx.fill();
+
+        // Angular Neon Earcups
+        hCtx.fillStyle = '#0e7490';
+        hCtx.strokeStyle = '#22d3ee';
+        hCtx.lineWidth = 2;
+        roundRect(hCtx, -27, -20, 7.5, 12, 2);
+        hCtx.fill();
+        hCtx.stroke();
+        roundRect(hCtx, 19.5, -20, 7.5, 12, 2);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // 3. Floating Cyber Sparks & Bolts
+        const cyberBob = Math.sin(now * 0.01) * 3.5;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('⚡', 48, -42 + cyberBob);
+        hCtx.fillText('💠', -48, -40 - cyberBob);
+        hCtx.fillText('🌐', 52, 6 - cyberBob);
+        hCtx.fillText('⚡', -52, 8 + cyberBob);
+        break;
+      }
+
+      case 3: { // 🕹️ 4: 8BIT CHIPTUNE (Sky Blue & Pixel Green / Arcade)
+        // 1. Iconic "Deal With It" Pixelated Blocky Retro Sunglasses
+        hCtx.save();
+        hCtx.fillStyle = '#0f172a';
+        hCtx.strokeStyle = '#38bdf8';
+        hCtx.lineWidth = 1.6;
+
+        // Stepped pixel block frames
+        const px = 2.6; // pixel unit
+        // Left eye pixel box
+        hCtx.fillRect(-18, -17, px * 6, px * 3.5);
+        hCtx.strokeRect(-18, -17, px * 6, px * 3.5);
+        // Right eye pixel box
+        hCtx.fillRect(3, -17, px * 6, px * 3.5);
+        hCtx.strokeRect(3, -17, px * 6, px * 3.5);
+        // Pixel Bridge
+        hCtx.fillRect(-3, -17, 6, px);
+        // White pixel glints
+        hCtx.fillStyle = '#ffffff';
+        hCtx.fillRect(-16, -16, px, px);
+        hCtx.fillRect(-13, -13, px, px);
+        hCtx.fillRect(5, -16, px, px);
+        hCtx.fillRect(8, -13, px, px);
+        hCtx.restore();
+
+        // 2. Chunky 8-Bit Arcade Headphones
+        hCtx.strokeStyle = '#0284c7';
+        hCtx.lineWidth = 4;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 23.5, -Math.PI * 0.88, -Math.PI * 0.12);
+        hCtx.stroke();
+
+        hCtx.fillStyle = '#22c55e';
+        hCtx.strokeStyle = '#15803d';
+        hCtx.lineWidth = 2;
+        hCtx.fillRect(-27, -21, 8, 14);
+        hCtx.strokeRect(-27, -21, 8, 14);
+        hCtx.fillRect(19, -21, 8, 14);
+        hCtx.strokeRect(19, -21, 8, 14);
+
+        // Center pixel yellow button on earcups
+        hCtx.fillStyle = '#facc15';
+        hCtx.fillRect(-25, -16, 4, 4);
+        hCtx.fillRect(21, -16, 4, 4);
+
+        // 3. Floating 8-Bit Arcade Icons
+        const pixelBob = Math.sin(now * 0.008) * 3;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('🕹️', 48, -42 + pixelBob);
+        hCtx.fillText('👾', -48, -40 - pixelBob);
+        hCtx.fillText('⭐', 52, 6 - pixelBob);
+        hCtx.fillText('💎', -52, 8 + pixelBob);
+        break;
+      }
+
+      case 4: { // 🎧 5: LIQUID DRUM & BASS (Amber Gold & Purple / Studio Monitor)
+        // 1. Sleek VIP Gold-Rimmed Club Aviator Sunglasses
+        hCtx.save();
+        const aviatorGrad = hCtx.createLinearGradient(0, -19, 0, -8);
+        aviatorGrad.addColorStop(0, '#1e1b4b');
+        aviatorGrad.addColorStop(1, '#581c87');
+        hCtx.fillStyle = aviatorGrad;
+        hCtx.strokeStyle = '#f59e0b';
+        hCtx.lineWidth = 2;
+        // Left teardrop lens
+        hCtx.beginPath();
+        hCtx.ellipse(-10, -14, 8, 5.5, -0.15, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+        // Right teardrop lens
+        hCtx.beginPath();
+        hCtx.ellipse(10, -14, 8, 5.5, 0.15, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+        // Double gold bridge
+        hCtx.beginPath();
+        hCtx.moveTo(-3, -16);
+        hCtx.lineTo(3, -16);
+        hCtx.moveTo(-3, -13);
+        hCtx.lineTo(3, -13);
+        hCtx.stroke();
+        hCtx.restore();
+
+        // 2. Huge Studio Pro Monitor Over-Ear Headphones with Real-Time Animated Equalizer Bars!
+        hCtx.strokeStyle = '#581c87';
+        hCtx.lineWidth = 4.2;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 24, -Math.PI * 0.9, -Math.PI * 0.1);
+        hCtx.stroke();
+
+        // Massive circular monitor cups
+        hCtx.fillStyle = '#2e1065';
+        hCtx.strokeStyle = '#f59e0b';
+        hCtx.lineWidth = 2.2;
+        hCtx.beginPath();
+        hCtx.arc(-24, -14, 8.5, 0, Math.PI * 2);
+        hCtx.arc(24, -14, 8.5, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Animated VU-meter graphic equalizer bars on earcups!
+        const vu1 = Math.abs(Math.sin(now * 0.012)) * 6;
+        const vu2 = Math.abs(Math.cos(now * 0.016)) * 6;
+        hCtx.fillStyle = '#fbbf24';
+        hCtx.fillRect(-26, -14 - vu1 / 2, 2, vu1);
+        hCtx.fillRect(-23, -14 - vu2 / 2, 2, vu2);
+        hCtx.fillRect(22, -14 - vu1 / 2, 2, vu1);
+        hCtx.fillRect(25, -14 - vu2 / 2, 2, vu2);
+
+        // 3. Floating Vinyl Record & Soundwaves
+        const dnbBob = Math.sin(now * 0.01) * 3.8;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('💿', 48, -42 + dnbBob);
+        hCtx.fillText('🎧', -48, -40 - dnbBob);
+        hCtx.fillText('🔊', 52, 6 - dnbBob);
+        hCtx.fillText('🎶', -52, 8 + dnbBob);
+        break;
+      }
+
+      case 5: { // 🔥 6: HAPPY HARDCORE (Crimson & Purple / Rave Laser)
+        // 1. Spiked Neon Rave Headband & Fiery Crimson Laser Goggles
+        hCtx.save();
+        hCtx.strokeStyle = '#dc2626';
+        hCtx.lineWidth = 4;
+        hCtx.beginPath();
+        hCtx.arc(0, -14, 24, -Math.PI * 0.9, -Math.PI * 0.1);
+        hCtx.stroke();
+
+        // 3 Rave Spikes on the headband!
+        hCtx.fillStyle = '#ef4444';
+        hCtx.strokeStyle = '#7f1d1d';
+        hCtx.lineWidth = 1.5;
+        // Center spike
+        hCtx.beginPath();
+        hCtx.moveTo(-3, -37);
+        hCtx.lineTo(0, -48);
+        hCtx.lineTo(3, -37);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+        // Left spike
+        hCtx.beginPath();
+        hCtx.moveTo(-16, -34);
+        hCtx.lineTo(-19, -45);
+        hCtx.lineTo(-11, -35);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+        // Right spike
+        hCtx.beginPath();
+        hCtx.moveTo(11, -35);
+        hCtx.lineTo(19, -45);
+        hCtx.lineTo(16, -34);
+        hCtx.closePath();
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Crimson Glowing Rave Laser Goggles
+        hCtx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+        hCtx.strokeStyle = '#f87171';
+        hCtx.lineWidth = 2.4;
+        roundRect(hCtx, -20, -18, 40, 10, 3);
+        hCtx.fill();
+        hCtx.stroke();
+
+        // Blazing yellow-hot laser center lines
+        hCtx.strokeStyle = '#fef08a';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.moveTo(-17, -13);
+        hCtx.lineTo(17, -13);
+        hCtx.stroke();
+
+        // Chunky Heavy Rave Earcups
+        hCtx.fillStyle = '#7f1d1d';
+        hCtx.strokeStyle = '#ef4444';
+        hCtx.lineWidth = 2;
+        hCtx.beginPath();
+        hCtx.arc(-24, -14, 8, 0, Math.PI * 2);
+        hCtx.arc(24, -14, 8, 0, Math.PI * 2);
+        hCtx.fill();
+        hCtx.stroke();
+        hCtx.restore();
+
+        // 2. Floating Fire & Explosions
+        const hcBob = Math.sin(now * 0.012) * 4;
+        hCtx.font = '16px sans-serif';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText('🔥', 48, -42 + hcBob);
+        hCtx.fillText('💥', -48, -40 - hcBob);
+        hCtx.fillText('⚡', 52, 6 - hcBob);
+        hCtx.fillText('🌟', -52, 8 + hcBob);
+        break;
+      }
+    }
+
+    hCtx.restore();
+  }
+
+  function drawProceduralStandingHamsterBody(hCtx, now, bounce) {
     // Soft ground shadow
     hCtx.fillStyle = 'rgba(120, 53, 15, 0.18)';
     hCtx.beginPath();
@@ -5054,88 +5587,6 @@
     hCtx.ellipse(6.5, 5 - pawWave, 4.2, 3.2, -0.35, 0, Math.PI * 2);
     hCtx.fill();
     hCtx.stroke();
-
-    // Cute DJ Headphones, Cool Club Sunglasses & Musical Notes when RHYTHM ROOM is selected!
-    if (roomType === 'rhythm') {
-      const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
-      // 1. DJ Headphones arch & earcups (tinted with current track accent color!)
-      hCtx.strokeStyle = '#7c3aed';
-      hCtx.lineWidth = 3.2;
-      hCtx.beginPath();
-      hCtx.arc(0, -10, 21.5, -Math.PI * 0.88, -Math.PI * 0.12);
-      hCtx.stroke();
-
-      hCtx.fillStyle = track.accentColor;
-      hCtx.strokeStyle = '#581c87';
-      hCtx.lineWidth = 1.6;
-      hCtx.beginPath();
-      hCtx.ellipse(-20, -10, 4.5, 7.5, -0.1, 0, Math.PI * 2);
-      hCtx.ellipse(20, -10, 4.5, 7.5, 0.1, 0, Math.PI * 2);
-      hCtx.fill();
-      hCtx.stroke();
-
-      // 2. Cool Club Sunglasses over the eyes!
-      hCtx.save();
-      // Temples (side arms going to ears/headphones)
-      hCtx.strokeStyle = '#0f172a';
-      hCtx.lineWidth = 2.2;
-      hCtx.beginPath();
-      hCtx.moveTo(-15, -13.5);
-      hCtx.lineTo(-19, -12);
-      hCtx.moveTo(15, -13.5);
-      hCtx.lineTo(19, -12);
-      hCtx.stroke();
-
-      // Left & Right Stylish Angular Club Lenses
-      const lensGrad = hCtx.createLinearGradient(0, -16, 0, -8);
-      lensGrad.addColorStop(0, '#090414');
-      lensGrad.addColorStop(0.55, '#1e1b4b');
-      lensGrad.addColorStop(1, '#7e22ce');
-
-      hCtx.fillStyle = lensGrad;
-      hCtx.strokeStyle = '#facc15';
-      hCtx.lineWidth = 1.6;
-
-      // Left lens
-      roundRect(hCtx, -15.5, -16, 13.5, 7.6, 2.5);
-      hCtx.fill();
-      hCtx.stroke();
-
-      // Right lens
-      roundRect(hCtx, 2.0, -16, 13.5, 7.6, 2.5);
-      hCtx.fill();
-      hCtx.stroke();
-
-      // Gold nose bridge
-      hCtx.strokeStyle = '#facc15';
-      hCtx.lineWidth = 2;
-      hCtx.beginPath();
-      hCtx.moveTo(-2, -13.5);
-      hCtx.lineTo(2, -13.5);
-      hCtx.stroke();
-
-      // Diagonal white/cyan lens reflection shine
-      hCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      hCtx.lineWidth = 1.6;
-      hCtx.lineCap = 'round';
-      hCtx.beginPath();
-      hCtx.moveTo(-12.5, -10.2);
-      hCtx.lineTo(-8.5, -14.2);
-      hCtx.moveTo(5.0, -10.2);
-      hCtx.lineTo(9.0, -14.2);
-      hCtx.stroke();
-      hCtx.restore();
-
-      // 3. Floating neon musical notes
-      hCtx.fillStyle = '#d946ef';
-      hCtx.font = '900 13px sans-serif';
-      hCtx.textAlign = 'center';
-      const noteY = Math.sin(now * 0.01) * 3;
-      hCtx.fillText('♪', 24, -28 + noteY);
-      hCtx.fillText('♫', -24, -26 - noteY);
-    }
-
-    hCtx.restore();
   }
 
   /**
