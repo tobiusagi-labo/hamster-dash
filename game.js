@@ -117,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '23';
+      const v = '24';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -156,7 +156,7 @@
     }
 
     initSoundLoaders() {
-      const v = '23';
+      const v = '24';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -4557,10 +4557,17 @@
       ctx.stroke();
 
       // Custom food image override if present
-      if (assets.drawImage(ctx, f.type.id, 0, 0, f.radius * 2.2, f.radius * 2.2)) {
+      const foodDrawSize = f.type.id === 'gold' ? f.radius * 2.5 : f.radius * 2.3;
+      if (f.type.id === 'gold') {
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 10;
+      }
+      if (assets.drawImage(ctx, f.type.id, 0, 0, foodDrawSize, foodDrawSize)) {
+        ctx.shadowBlur = 0;
         ctx.restore();
         continue;
       }
+      ctx.shadowBlur = 0;
 
       if (f.type.id === 'seed') {
         ctx.rotate(-0.3);
@@ -6048,22 +6055,26 @@
       sCtx.lineWidth = 2;
       sCtx.stroke();
 
-      sCtx.rotate(-0.3);
-      sCtx.fillStyle = '#451a03';
-      sCtx.beginPath();
-      sCtx.ellipse(0, 0, 8, 11, 0, 0, Math.PI * 2);
-      sCtx.fill();
-      sCtx.strokeStyle = '#fef3c7';
-      sCtx.lineWidth = 1.6;
-      sCtx.beginPath();
-      sCtx.moveTo(0, -8.5);
-      sCtx.lineTo(0, 8.5);
-      sCtx.moveTo(-3.8, -6);
-      sCtx.quadraticCurveTo(-5.5, 0, -3, 7);
-      sCtx.moveTo(3.8, -6);
-      sCtx.quadraticCurveTo(5.5, 0, 3, 7);
-      sCtx.stroke();
-      sCtx.restore();
+      if (assets.drawImage(sCtx, 'seed', 0, 0, 24, 24)) {
+        sCtx.restore();
+      } else {
+        sCtx.rotate(-0.3);
+        sCtx.fillStyle = '#451a03';
+        sCtx.beginPath();
+        sCtx.ellipse(0, 0, 8, 11, 0, 0, Math.PI * 2);
+        sCtx.fill();
+        sCtx.strokeStyle = '#fef3c7';
+        sCtx.lineWidth = 1.6;
+        sCtx.beginPath();
+        sCtx.moveTo(0, -8.5);
+        sCtx.lineTo(0, 8.5);
+        sCtx.moveTo(-3.8, -6);
+        sCtx.quadraticCurveTo(-5.5, 0, -3, 7);
+        sCtx.moveTo(3.8, -6);
+        sCtx.quadraticCurveTo(5.5, 0, 3, 7);
+        sCtx.stroke();
+        sCtx.restore();
+      }
     }
 
     const cheeseCanvas = document.getElementById('guide-food-cheese');
@@ -6080,24 +6091,28 @@
       cCtx.lineWidth = 2;
       cCtx.stroke();
 
-      cCtx.fillStyle = '#facc15';
-      cCtx.strokeStyle = '#ca8a04';
-      cCtx.lineWidth = 1.8;
-      cCtx.beginPath();
-      cCtx.moveTo(-9.5, 6.5);
-      cCtx.lineTo(10.5, 6.5);
-      cCtx.lineTo(3, -9);
-      cCtx.closePath();
-      cCtx.fill();
-      cCtx.stroke();
+      if (assets.drawImage(cCtx, 'cheese', 0, 0, 24, 24)) {
+        cCtx.restore();
+      } else {
+        cCtx.fillStyle = '#facc15';
+        cCtx.strokeStyle = '#ca8a04';
+        cCtx.lineWidth = 1.8;
+        cCtx.beginPath();
+        cCtx.moveTo(-9.5, 6.5);
+        cCtx.lineTo(10.5, 6.5);
+        cCtx.lineTo(3, -9);
+        cCtx.closePath();
+        cCtx.fill();
+        cCtx.stroke();
 
-      cCtx.fillStyle = '#eab308';
-      cCtx.beginPath();
-      cCtx.arc(-1.8, 2.5, 2, 0, Math.PI * 2);
-      cCtx.arc(4, 3, 1.5, 0, Math.PI * 2);
-      cCtx.arc(1.2, -2.5, 1.4, 0, Math.PI * 2);
-      cCtx.fill();
-      cCtx.restore();
+        cCtx.fillStyle = '#eab308';
+        cCtx.beginPath();
+        cCtx.arc(-1.8, 2.5, 2, 0, Math.PI * 2);
+        cCtx.arc(4, 3, 1.5, 0, Math.PI * 2);
+        cCtx.arc(1.2, -2.5, 1.4, 0, Math.PI * 2);
+        cCtx.fill();
+        cCtx.restore();
+      }
     }
 
     const goldCanvas = document.getElementById('guide-food-gold');
@@ -6114,25 +6129,30 @@
       gCtx.lineWidth = 2.2;
       gCtx.stroke();
 
-      gCtx.fillStyle = '#fde047';
       gCtx.shadowColor = '#f59e0b';
       gCtx.shadowBlur = 8;
-      gCtx.beginPath();
-      gCtx.ellipse(0, 0, 8.5, 11.5, 0.2, 0, Math.PI * 2);
-      gCtx.fill();
-      gCtx.shadowBlur = 0;
+      if (assets.drawImage(gCtx, 'gold', 0, 0, 25, 25)) {
+        gCtx.shadowBlur = 0;
+        gCtx.restore();
+      } else {
+        gCtx.fillStyle = '#fde047';
+        gCtx.beginPath();
+        gCtx.ellipse(0, 0, 8.5, 11.5, 0.2, 0, Math.PI * 2);
+        gCtx.fill();
+        gCtx.shadowBlur = 0;
 
-      gCtx.strokeStyle = '#ca8a04';
-      gCtx.lineWidth = 1.5;
-      gCtx.stroke();
+        gCtx.strokeStyle = '#ca8a04';
+        gCtx.lineWidth = 1.5;
+        gCtx.stroke();
 
-      gCtx.strokeStyle = '#ffffff';
-      gCtx.lineWidth = 1.8;
-      gCtx.beginPath();
-      gCtx.moveTo(-2.5, -5.5);
-      gCtx.lineTo(-2.5, 4.5);
-      gCtx.stroke();
-      gCtx.restore();
+        gCtx.strokeStyle = '#ffffff';
+        gCtx.lineWidth = 1.8;
+        gCtx.beginPath();
+        gCtx.moveTo(-2.5, -5.5);
+        gCtx.lineTo(-2.5, 4.5);
+        gCtx.stroke();
+        gCtx.restore();
+      }
     }
   }
 
