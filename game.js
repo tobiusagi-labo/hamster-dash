@@ -129,6 +129,9 @@
         const aud = new Audio();
         aud.preload = 'auto';
         aud.src = src;
+        aud.addEventListener('loadedmetadata', () => {
+          this.sounds[key] = aud;
+        });
         aud.addEventListener('canplay', () => {
           this.sounds[key] = aud;
         });
@@ -138,7 +141,7 @@
         aud.addEventListener('error', () => {
           this.sounds[key] = null; // ファイルが無いときは内蔵シンセサイザー
         });
-        if (typeof fetch !== 'undefined') {
+        if (typeof fetch !== 'undefined' && window.location.protocol.startsWith('http')) {
           fetch(src, { method: 'HEAD' })
             .then((res) => {
               if (res.ok) {
@@ -148,7 +151,7 @@
               }
             })
             .catch(() => {
-              this.sounds[key] = null;
+              // ネットワーク例外時はloadedmetadata/canplayの判定を維持
             });
         }
       }
