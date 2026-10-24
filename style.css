@@ -621,16 +621,16 @@ html, body {
   justify-content: center;
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #ffffff;
-  font-size: clamp(11.5px, 3.2vw, 13.5px);
+  font-size: clamp(23px, 6.4vw, 27px);
   font-weight: 900;
   letter-spacing: 0.04em;
-  padding: 4px 14px;
+  padding: 6px 22px;
   border-radius: 999px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.28);
+  box-shadow: 0 3px 12px rgba(180, 83, 9, 0.35);
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
@@ -642,7 +642,7 @@ html, body {
 
 .hub-card.rhythm-room-active .room-current-badge {
   background: linear-gradient(135deg, #d946ef, #7c3aed);
-  box-shadow: 0 2px 10px rgba(217, 70, 239, 0.45);
+  box-shadow: 0 3px 14px rgba(217, 70, 239, 0.45);
 }
 
 .hub-card.rhythm-room-active .hub-title {
@@ -778,13 +778,19 @@ html, body {
   background: linear-gradient(135deg, #ea580c, #c2410c);
   border: 2px solid #fde047;
   border-radius: 12px;
-  padding: 3px 6px;
+  padding: 4px 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 3px 8px rgba(234, 88, 12, 0.35);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   animation: pop-bounce 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.1s ease;
+}
+
+.living-option-badge:active {
+  transform: scale(0.95);
 }
 
 .living-option-badge.ice-theme {
@@ -1495,8 +1501,50 @@ html, body {
   background: #fef3c7;
   border: 2.5px solid #f59e0b;
   border-radius: 18px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   margin-bottom: 16px;
+}
+
+.pause-bgm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pause-bgm-label {
+  font-size: 14.5px;
+  font-weight: 900;
+  color: #78350f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pause-bgm-toggle-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ffffff;
+  border: 2px solid #86efac;
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(22, 163, 74, 0.3);
+  transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pause-bgm-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.pause-bgm-toggle-btn.bgm-off {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border-color: #fca5a5;
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.3);
 }
 
 .pause-volume-header {

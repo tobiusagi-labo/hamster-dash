@@ -67,6 +67,8 @@
   const livingTrackBadge = document.getElementById('living-track-badge');
   const livingTrackNameEl = document.getElementById('living-track-name');
   const livingTrackBpmEl = document.getElementById('living-track-bpm');
+  const livingOptionBadge = document.getElementById('living-option-badge');
+  const livingOptionTextEl = document.getElementById('living-option-text');
 
   const POP_FONT = '"Mochiy Pop One", "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif';
 
@@ -89,7 +91,7 @@
     }
 
     initImageLoaders() {
-      const v = '16';
+      const v = '17';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -127,7 +129,7 @@
     }
 
     initSoundLoaders() {
-      const v = '16';
+      const v = '17';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -589,12 +591,13 @@
     }
 
     syncVolumeUI() {
-      const pct = Math.round((this.muted ? 0 : this.volume) * 100);
-      const icon = this.muted || pct === 0 ? '🔇' : pct < 45 ? '🔉' : '🔊';
+      const isOff = this.muted;
+      const icon = isOff ? '🔇' : '🔊';
       if (soundBtn) soundBtn.textContent = icon;
-      if (btnPauseMute) btnPauseMute.textContent = icon;
-      if (volumeSlider) volumeSlider.value = String(pct);
-      if (volumeValEl) volumeValEl.textContent = `${pct}%`;
+      if (btnPauseMute) {
+        btnPauseMute.innerHTML = isOff ? '🔇 BGM OFF' : '🔊 BGM ON';
+        btnPauseMute.classList.toggle('bgm-off', isOff);
+      }
     }
 
     setVolume(val) {
@@ -2583,6 +2586,7 @@
       if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
       if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆タップで曲変更`;
       if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
+      if (livingOptionBadge) livingOptionBadge.classList.add('hidden');
       if (hubCenterHamster) hubCenterHamster.title = 'タップで曲変更';
     } else {
       const livingTrack = LIVING_TRACKS[livingTrackIndex % LIVING_TRACKS.length] || LIVING_TRACKS[0];
@@ -2601,7 +2605,21 @@
       }
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
       if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
-      if (hubCenterHamster) hubCenterHamster.title = 'ハムスター';
+      if (livingOptionBadge) {
+        if (livingOption === 'cat') {
+          livingOptionBadge.classList.remove('hidden', 'ice-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+';
+        } else if (livingOption === 'ice') {
+          livingOptionBadge.classList.remove('hidden');
+          livingOptionBadge.classList.add('ice-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+';
+        } else {
+          livingOptionBadge.classList.add('hidden');
+        }
+      }
+      if (hubCenterHamster) {
+        hubCenterHamster.title = livingOption === 'none' ? '5回タップで裏モード切替' : `現在: ${livingOption.toUpperCase()}+ (5回タップで切替)`;
+      }
     }
   }
 
@@ -2700,8 +2718,40 @@
         changeRhythmTrack(1);
       } else {
         hamsterTapPulseTimer = 0.36;
-        sound.playUIClick();
+        livingTapCount++;
+        if (livingTapCount >= 5) {
+          livingTapCount = 0;
+          if (livingOption === 'none') {
+            livingOption = 'cat';
+          } else if (livingOption === 'cat') {
+            livingOption = 'ice';
+          } else {
+            livingOption = 'none';
+          }
+          sound.playCountdown(true); // ポップな通知音
+        } else {
+          sound.playUIClick();
+        }
+        updateRoomSwitchUI();
       }
+    });
+  }
+
+  if (livingOptionBadge) {
+    livingOptionBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.init();
+      hamsterTapPulseTimer = 0.36;
+      livingTapCount = 0;
+      if (livingOption === 'none') {
+        livingOption = 'cat';
+      } else if (livingOption === 'cat') {
+        livingOption = 'ice';
+      } else {
+        livingOption = 'none';
+      }
+      sound.playCountdown(true);
+      updateRoomSwitchUI();
     });
   }
 
@@ -4945,11 +4995,11 @@
     // Custom hub standing hamster image override for LIVING ROOM (Sunflower Seed Hamster)
     if (roomType === 'living' && assets.hasImage('hub_hamster')) {
       const img = assets.getImage('hub_hamster');
-      let dw = 144;
-      let dh = 144;
+      let dw = 138;
+      let dh = 154;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 148;
+        dh = 154;
         dw = dh * aspect;
         if (dw > 146) {
           dw = 146;
@@ -4960,7 +5010,7 @@
       // Soft ground shadow under hamster
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 62 - bounce * 0.35, 42, 9.5, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 62 - bounce * 0.35, 44, 9.5, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);

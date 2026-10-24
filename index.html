@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=16" />
+  <link rel="stylesheet" href="style.css?v=17" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -85,7 +85,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.4.1</div>
+          <div class="title-version-badge">ver 1.4.2</div>
         </div>
       </div>
 
@@ -122,6 +122,9 @@
               <div class="rhythm-track-badge hidden" id="rhythm-track-badge">
                 <span class="rhythm-track-name" id="rhythm-track-name">🍬 1: KAWAII EDM</span>
                 <span class="rhythm-track-bpm" id="rhythm-track-bpm">BPM160 👆タップで曲変更</span>
+              </div>
+              <div class="living-option-badge hidden" id="living-option-badge">
+                <span class="living-option-text" id="living-option-text">🐾 Cat+</span>
               </div>
             </div>
 
@@ -254,22 +257,11 @@
           <h3 class="howto-title pause-title">メニュー</h3>
 
           <div class="pause-volume-box">
-            <div class="pause-volume-header">
-              <span class="pause-volume-label">🔊 音量調節</span>
-              <span class="pause-volume-val" id="volume-val">80%</span>
-            </div>
-            <div class="pause-volume-controls">
-              <button type="button" class="pause-mute-btn" id="btn-pause-mute" aria-label="ミュート切替">🔊</button>
-              <input
-                type="range"
-                id="volume-slider"
-                class="volume-slider"
-                min="0"
-                max="100"
-                step="1"
-                value="80"
-                aria-label="音量スライダー"
-              />
+            <div class="pause-bgm-row">
+              <span class="pause-bgm-label">🎵 BGM設定</span>
+              <button type="button" class="pause-bgm-toggle-btn" id="btn-pause-mute" aria-label="BGMオンオフ">
+                🔊 BGM ON
+              </button>
             </div>
           </div>
 
@@ -325,6 +317,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=16"></script>
+  <script src="game.js?v=17"></script>
 </body>
 </html>
