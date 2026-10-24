@@ -89,25 +89,26 @@
     }
 
     initImageLoaders() {
+      const v = '16';
       const imageFiles = {
-        player: 'assets/images/player.png',
-        seed: 'assets/images/seed.png',
-        cheese: 'assets/images/cheese.png',
-        gold: 'assets/images/gold.png',
-        vacuum: 'assets/images/vacuum.png',
-        yarn: 'assets/images/yarn.png',
-        cat_paw: 'assets/images/cat_paw.png',
-        cat_paw_1: 'assets/images/cat_paw_1.png',
-        cat_paw_2: 'assets/images/cat_paw_2.png',
-        title_mascot: 'assets/images/title_mascot.png',
-        hub_hamster: 'assets/images/hub_hamster.png',
-        hub_hamster_rhythm: 'assets/images/hub_hamster_rhythm.png',
-        result_clear: 'assets/images/result_clear.png',
-        result_roomba: 'assets/images/result_roomba.png',
-        result_yarn: 'assets/images/result_yarn.png',
-        result_patrol: 'assets/images/result_patrol.png',
-        result_cat: 'assets/images/result_cat.png',
-        result_starve: 'assets/images/result_starve.png',
+        player: `assets/images/player.png?v=${v}`,
+        seed: `assets/images/seed.png?v=${v}`,
+        cheese: `assets/images/cheese.png?v=${v}`,
+        gold: `assets/images/gold.png?v=${v}`,
+        vacuum: `assets/images/vacuum.png?v=${v}`,
+        yarn: `assets/images/yarn.png?v=${v}`,
+        cat_paw: `assets/images/cat_paw.png?v=${v}`,
+        cat_paw_1: `assets/images/cat_paw_1.png?v=${v}`,
+        cat_paw_2: `assets/images/cat_paw_2.png?v=${v}`,
+        title_mascot: `assets/images/title_mascot.png?v=${v}`,
+        hub_hamster: `assets/images/hub_hamster.png?v=${v}`,
+        hub_hamster_rhythm: `assets/images/hub_hamster_rhythm.png?v=${v}`,
+        result_clear: `assets/images/result_clear.png?v=${v}`,
+        result_roomba: `assets/images/result_roomba.png?v=${v}`,
+        result_yarn: `assets/images/result_yarn.png?v=${v}`,
+        result_patrol: `assets/images/result_patrol.png?v=${v}`,
+        result_cat: `assets/images/result_cat.png?v=${v}`,
+        result_starve: `assets/images/result_starve.png?v=${v}`,
       };
 
       for (const [key, src] of Object.entries(imageFiles)) {
@@ -126,15 +127,16 @@
     }
 
     initSoundLoaders() {
+      const v = '16';
       const soundFiles = {
-        living_bgm: 'assets/sounds/living_bgm.mp3',
-        living_bgm2: 'assets/sounds/living_bgm2.mp3',
-        rhythm_1: 'assets/sounds/rhythm_1.mp3',
-        rhythm_2: 'assets/sounds/rhythm_2.mp3',
-        rhythm_3: 'assets/sounds/rhythm_3.mp3',
-        rhythm_4: 'assets/sounds/rhythm_4.mp3',
-        rhythm_5: 'assets/sounds/rhythm_5.mp3',
-        rhythm_6: 'assets/sounds/rhythm_6.mp3',
+        living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
+        living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
+        rhythm_1: `assets/sounds/rhythm_1.mp3?v=${v}`,
+        rhythm_2: `assets/sounds/rhythm_2.mp3?v=${v}`,
+        rhythm_3: `assets/sounds/rhythm_3.mp3?v=${v}`,
+        rhythm_4: `assets/sounds/rhythm_4.mp3?v=${v}`,
+        rhythm_5: `assets/sounds/rhythm_5.mp3?v=${v}`,
+        rhythm_6: `assets/sounds/rhythm_6.mp3?v=${v}`,
       };
 
       for (const [key, src] of Object.entries(soundFiles)) {
@@ -439,7 +441,7 @@
 
     getTargetBgmVolume() {
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      const baseRatio = isRhythm ? 0.40 : 0.80; // リズムモードのBGM音量のみ現在の約50%に抑制
+      const baseRatio = isRhythm ? 0.08 : 0.16; // 全体BGM音量を現在の約20%に調整（RHYTHM: 0.40*0.2=0.08, LIVING: 0.80*0.2=0.16）
       return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * baseRatio));
     }
 
@@ -946,8 +948,8 @@
         bass.type = 'triangle';
         bass.frequency.setValueAtTime(bassFreq * 1.03, now);
         bass.frequency.exponentialRampToValueAtTime(bassFreq, now + 0.02);
-        bGain.gain.setValueAtTime(0.085, now);
-        bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        bGain.gain.setValueAtTime(0.017, now);
+        bGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.16);
         bass.connect(bGain);
         bGain.connect(this.dest);
         bass.start(now);
@@ -963,8 +965,8 @@
           const cGain = this.ctx.createGain();
           cOsc.type = 'sine';
           cOsc.frequency.setValueAtTime(cFreq, now + idx * 0.012);
-          cGain.gain.setValueAtTime(0.038, now + idx * 0.012);
-          cGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.012 + 0.095);
+          cGain.gain.setValueAtTime(0.008, now + idx * 0.012);
+          cGain.gain.exponentialRampToValueAtTime(0.0002, now + idx * 0.012 + 0.095);
           cOsc.connect(cGain);
           cGain.connect(this.dest);
           cOsc.start(now + idx * 0.012);
@@ -980,8 +982,8 @@
         const mGain = this.ctx.createGain();
         mel.type = 'sine';
         mel.frequency.setValueAtTime(melFreq, now);
-        mGain.gain.setValueAtTime(0.09, now);
-        mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.145);
+        mGain.gain.setValueAtTime(0.018, now);
+        mGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.145);
         mel.connect(mGain);
         mGain.connect(this.dest);
         mel.start(now);
@@ -992,7 +994,7 @@
         const hGain = this.ctx.createGain();
         harm.type = 'triangle';
         harm.frequency.setValueAtTime(melFreq * 2, now);
-        hGain.gain.setValueAtTime(0.035, now);
+        hGain.gain.setValueAtTime(0.007, now);
         hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         harm.connect(hGain);
         hGain.connect(this.dest);
@@ -1023,7 +1025,7 @@
         const isDown = b === 0;
         kick.frequency.setValueAtTime(isDown ? 165 : 135, now);
         kick.frequency.exponentialRampToValueAtTime(32, now + 0.13);
-        kGain.gain.setValueAtTime(isDown ? 0.28 : 0.21, now);
+        kGain.gain.setValueAtTime(isDown ? 0.056 : 0.042, now);
         kGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
         kick.connect(kGain);
         kGain.connect(this.dest);
@@ -1036,8 +1038,8 @@
         click.type = 'triangle';
         click.frequency.setValueAtTime(800, now);
         click.frequency.exponentialRampToValueAtTime(80, now + 0.025);
-        cGain.gain.setValueAtTime(0.12, now);
-        cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        cGain.gain.setValueAtTime(0.024, now);
+        cGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.03);
         click.connect(cGain);
         cGain.connect(this.dest);
         click.start(now);
@@ -1049,8 +1051,8 @@
         snare.type = 'triangle';
         snare.frequency.setValueAtTime(220, now);
         snare.frequency.exponentialRampToValueAtTime(65, now + 0.09);
-        sGain.gain.setValueAtTime(0.15, now);
-        sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+        sGain.gain.setValueAtTime(0.030, now);
+        sGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.095);
         snare.connect(sGain);
         sGain.connect(this.dest);
         snare.start(now);
@@ -1062,8 +1064,8 @@
         hat.type = 'square';
         hat.frequency.setValueAtTime(track.hatFreq, now);
         hat.frequency.exponentialRampToValueAtTime(260, now + 0.07);
-        hGain.gain.setValueAtTime(0.08, now);
-        hGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+        hGain.gain.setValueAtTime(0.016, now);
+        hGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.075);
         hat.connect(hGain);
         hGain.connect(this.dest);
         hat.start(now);
@@ -1078,9 +1080,9 @@
       bass.frequency.setValueAtTime(bFreq, now);
       // Slight pitch envelope for funky punch
       bass.frequency.exponentialRampToValueAtTime(bFreq * 0.98, now + 0.08);
-      const bVol = (track.bassWave === 'sawtooth' || track.bassWave === 'square') ? 0.09 : 0.15;
+      const bVol = (track.bassWave === 'sawtooth' || track.bassWave === 'square') ? 0.018 : 0.030;
       bGain.gain.setValueAtTime(bVol, now);
-      bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      bGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.17);
       bass.connect(bGain);
       bGain.connect(this.dest);
       bass.start(now);
@@ -1094,8 +1096,8 @@
           const pGain = this.ctx.createGain();
           pad.type = 'sine';
           pad.frequency.setValueAtTime(cFreq, now);
-          pGain.gain.setValueAtTime(0.042, now);
-          pGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          pGain.gain.setValueAtTime(0.0084, now);
+          pGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.22);
           pad.connect(pGain);
           pGain.connect(this.ctx.destination);
           pad.start(now);
@@ -1108,9 +1110,9 @@
       const lGain = this.ctx.createGain();
       lead.type = track.leadWave;
       lead.frequency.setValueAtTime(track.melodyFreqs[b], now);
-      const baseLeadGain = (track.leadWave === 'sawtooth' || track.leadWave === 'square') ? 0.085 : 0.13;
+      const baseLeadGain = (track.leadWave === 'sawtooth' || track.leadWave === 'square') ? 0.017 : 0.026;
       lGain.gain.setValueAtTime(b === 0 ? baseLeadGain * 1.25 : baseLeadGain, now);
-      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      lGain.gain.exponentialRampToValueAtTime(0.0002, now + 0.17);
       lead.connect(lGain);
       lGain.connect(this.dest);
       lead.start(now);
@@ -2560,7 +2562,7 @@
       const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
       hubCard.classList.add('rhythm-room-active');
       if (roomCurrentBadge) {
-        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.shortLabel})`;
+        roomCurrentBadge.textContent = '🎵 RHYTHM ROOM';
       }
       if (hubSubText) {
         hubSubText.innerHTML = 'リズムに合わせて高速移動‼ <span class="rhythm-sound-note">※音あり推奨</span>';
@@ -2581,11 +2583,12 @@
       if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
       if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆タップで曲変更`;
       if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
+      if (hubCenterHamster) hubCenterHamster.title = 'タップで曲変更';
     } else {
       const livingTrack = LIVING_TRACKS[livingTrackIndex % LIVING_TRACKS.length] || LIVING_TRACKS[0];
       hubCard.classList.remove('rhythm-room-active');
       if (roomCurrentBadge) {
-        roomCurrentBadge.textContent = `🏠 LIVING ROOM (${livingTrack.shortLabel})`;
+        roomCurrentBadge.textContent = '🏠 LIVING ROOM';
       }
       if (hubSubText) hubSubText.textContent = '画面タップの位置に高速移動！';
       if (pillLiving) {
@@ -2597,19 +2600,23 @@
         pillRhythm.setAttribute('aria-selected', 'false');
       }
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
-      if (livingTrackBadge) {
-        livingTrackBadge.classList.remove('hidden');
-        if (livingTrackNameEl) livingTrackNameEl.textContent = livingTrack.shortLabel;
-        if (livingTrackBpmEl) livingTrackBpmEl.textContent = `BPM${livingTrack.bpm} 👆タップで曲変更`;
-      }
+      if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
+      if (hubCenterHamster) hubCenterHamster.title = 'ハムスター';
     }
   }
 
   function switchRoom(targetType) {
     sound.init();
     if (targetType === 'toggle') {
-      roomType = roomType === 'living' ? 'rhythm' : 'living';
+      const nextType = roomType === 'living' ? 'rhythm' : 'living';
+      if (nextType === 'living') {
+        livingTrackIndex = (livingTrackIndex + 1) % LIVING_TRACKS.length;
+      }
+      roomType = nextType;
     } else if (roomType !== targetType) {
+      if (targetType === 'living') {
+        livingTrackIndex = (livingTrackIndex + 1) % LIVING_TRACKS.length;
+      }
       roomType = targetType;
     } else {
       return; // Already active, no duplicate flip
@@ -2626,7 +2633,7 @@
       sound.playLivingBgmStep(0);
     }
     updateRoomSwitchUI();
-    syncRoomBgm();
+    syncRoomBgm(true);
   }
 
   function changeRhythmTrack(delta) {
@@ -2666,12 +2673,12 @@
     hamsterTapPulseTimer = 0.36;
     sound.playUIClick();
     updateRoomSwitchUI();
-    syncRoomBgm();
+    syncRoomBgm(true);
   }
 
   // Center Hamster Tap & Track Badge Tap in Mode Select:
   // - RHYTHM: Tap hamster illustration or badge to cycle through 6 tracks!
-  // - LIVING: Tap hamster illustration or badge to cycle through 2 living tracks!
+  // - LIVING: Tap hamster for cute hop reaction (track alternates upon entering Living Room)
   if (rhythmTrackBadge) {
     rhythmTrackBadge.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2692,7 +2699,8 @@
       if (roomType === 'rhythm') {
         changeRhythmTrack(1);
       } else {
-        changeLivingTrack(1);
+        hamsterTapPulseTimer = 0.36;
+        sound.playUIClick();
       }
     });
   }
