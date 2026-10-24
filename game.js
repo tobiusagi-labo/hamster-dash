@@ -117,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '20';
+      const v = '21';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
@@ -155,7 +155,7 @@
     }
 
     initSoundLoaders() {
-      const v = '20';
+      const v = '21';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -487,7 +487,7 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      const baseRatio = isRhythm ? 0.08 : 0.16; // 全体BGM音量を現在の約20%に調整（RHYTHM: 0.40*0.2=0.08, LIVING: 0.80*0.2=0.16）
+      const baseRatio = isRhythm ? 0.22 : 0.35; // BGM音量を心地よく聞き取りやすいバランスに調整 (リズム: 0.22, リビング: 0.35)
       return Math.max(0, Math.min(1, this.volume * baseRatio));
     }
 
@@ -528,8 +528,7 @@
       const targetVol = this.getTargetBgmVolume();
       this.playerA.volume = targetVol;
       this.playerB.volume = 0;
-      this.attachMediaElement(this.playerA);
-      if (this.playerB) this.attachMediaElement(this.playerB);
+      // <audio>タグはWeb Audioルーティング(createMediaElementSource)による音量減衰やバグを避けるためネイティブ直接再生
       try {
         this.playerA.currentTime = Math.max(0, startOffset);
         const p = this.playerA.play();
@@ -648,19 +647,6 @@
       }
       if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume();
-      }
-    }
-
-    attachMediaElement(audioEl) {
-      if (!this.ctx || !this.analyser || !audioEl) return;
-      if (this.mediaSources.has(audioEl)) return;
-      try {
-        audioEl.crossOrigin = 'anonymous';
-        const srcNode = this.ctx.createMediaElementSource(audioEl);
-        srcNode.connect(this.analyser);
-        this.mediaSources.set(audioEl, srcNode);
-      } catch (_) {
-        // Silently catch if CORS restricts createMediaElementSource on local file:// or already connected
       }
     }
 
