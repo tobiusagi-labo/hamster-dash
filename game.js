@@ -7677,11 +7677,15 @@
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
-    sound.updateBgmLoop(dt);
-    update(dt);
-    render();
-    renderMenuCanvases(now, dt);
-    drawHudOscilloscope(now, dt);
+    try {
+      sound.updateBgmLoop(dt);
+      update(dt);
+      render();
+      renderMenuCanvases(now, dt);
+      drawHudOscilloscope(now, dt);
+    } catch (loopErr) {
+      console.warn('Game loop exception:', loopErr);
+    }
 
     requestAnimationFrame(loop);
   }
