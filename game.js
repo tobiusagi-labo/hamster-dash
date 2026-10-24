@@ -122,18 +122,35 @@
         rhythm_3: 'assets/sounds/rhythm_3.mp3',
         rhythm_4: 'assets/sounds/rhythm_4.mp3',
         rhythm_5: 'assets/sounds/rhythm_5.mp3',
+        rhythm_6: 'assets/sounds/rhythm_6.mp3',
       };
 
       for (const [key, src] of Object.entries(soundFiles)) {
         const aud = new Audio();
         aud.preload = 'auto';
-        aud.oncanplaythrough = () => {
-          this.sounds[key] = aud;
-        };
-        aud.onerror = () => {
-          this.sounds[key] = null; // ファイルが無いときは内蔵シンセサイザー
-        };
         aud.src = src;
+        aud.addEventListener('canplay', () => {
+          this.sounds[key] = aud;
+        });
+        aud.addEventListener('canplaythrough', () => {
+          this.sounds[key] = aud;
+        });
+        aud.addEventListener('error', () => {
+          this.sounds[key] = null; // ファイルが無いときは内蔵シンセサイザー
+        });
+        if (typeof fetch !== 'undefined') {
+          fetch(src, { method: 'HEAD' })
+            .then((res) => {
+              if (res.ok) {
+                this.sounds[key] = aud;
+              } else {
+                this.sounds[key] = null;
+              }
+            })
+            .catch(() => {
+              this.sounds[key] = null;
+            });
+        }
       }
     }
 
@@ -143,6 +160,14 @@
 
     getImage(key) {
       return this.images[key] || null;
+    }
+
+    hasSound(key) {
+      return !!this.sounds[key];
+    }
+
+    getSound(key) {
+      return this.sounds[key] || null;
     }
 
     drawImage(tCtx, key, x, y, w, h, angle = 0) {
@@ -159,18 +184,18 @@
 
   const assets = new AssetManager();
 
-  // --- 5 Selectable RHYTHM ROOM Tracks (Different Genres, all BPM 160~180) ---
+  // --- 6 Selectable RHYTHM ROOM Tracks (Different Genres, BPM 160~185) ---
   const RHYTHM_TRACKS = [
     {
-      id: 'electro',
-      shortLabel: '🎵1: ELECTRO',
-      fullName: 'ELECTRO CLUB',
+      id: 'kawaii',
+      shortLabel: '🍬1: KAWAII',
+      fullName: 'KAWAII EDM',
       bpm: 160,
       accentColor: '#ec4899',
-      leadWave: 'triangle',
+      leadWave: 'sine',
       bassWave: 'triangle',
-      kickStart: 155,
-      hatFreq: 760,
+      kickStart: 160,
+      hatFreq: 1100,
       bassFreqs: [130.81, 130.81, 164.81, 164.81, 174.61, 174.61, 196.0, 196.0],
       melodyFreqs: [523.25, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 783.99],
       beatChords: [
@@ -185,10 +210,56 @@
       ],
     },
     {
-      id: 'chiptune',
-      shortLabel: '🕹️2: 8BIT',
-      fullName: '8BIT ARCADE',
+      id: 'eurobeat',
+      shortLabel: '🏎️2: EUROBEAT',
+      fullName: 'EUROBEAT RACER',
       bpm: 165,
+      accentColor: '#f97316',
+      leadWave: 'sawtooth',
+      bassWave: 'sawtooth',
+      kickStart: 160,
+      hatFreq: 980,
+      bassFreqs: [146.83, 146.83, 174.61, 174.61, 196.0, 196.0, 220.0, 220.0],
+      melodyFreqs: [587.33, 698.46, 783.99, 880.0, 1046.5, 880.0, 783.99, 698.46],
+      beatChords: [
+        [587.33, 698.46, 880.0, 1046.5],
+        [587.33, 783.99, 1046.5, 1318.5],
+        [698.46, 880.0, 1046.5, 1396.91],
+        [659.25, 783.99, 987.77, 1318.5],
+        [587.33, 698.46, 880.0, 1174.66],
+        [698.46, 880.0, 1174.66, 1396.91],
+        [659.25, 783.99, 1046.5, 1567.98],
+        [587.33, 880.0, 1046.5, 1318.5],
+      ],
+    },
+    {
+      id: 'techno',
+      shortLabel: '⚡3: TECHNO',
+      fullName: 'CYBER TECHNO',
+      bpm: 170,
+      accentColor: '#06b6d4',
+      leadWave: 'square',
+      bassWave: 'sawtooth',
+      kickStart: 180,
+      hatFreq: 940,
+      bassFreqs: [110.0, 110.0, 130.81, 130.81, 146.83, 146.83, 164.81, 164.81],
+      melodyFreqs: [440.0, 523.25, 587.33, 659.25, 587.33, 523.25, 440.0, 659.25],
+      beatChords: [
+        [440.0, 523.25, 659.25],
+        [523.25, 659.25, 783.99],
+        [587.33, 698.46, 880.0],
+        [659.25, 783.99, 987.77],
+        [587.33, 698.46, 880.0],
+        [523.25, 659.25, 783.99],
+        [440.0, 523.25, 659.25],
+        [659.25, 783.99, 987.77],
+      ],
+    },
+    {
+      id: 'chiptune',
+      shortLabel: '🕹️4: 8BIT',
+      fullName: '8BIT ARCADE',
+      bpm: 175,
       accentColor: '#38bdf8',
       leadWave: 'square',
       bassWave: 'triangle',
@@ -208,15 +279,15 @@
       ],
     },
     {
-      id: 'disco',
-      shortLabel: '🎷3: DISCO',
-      fullName: 'FUNKY DISCO',
-      bpm: 170,
+      id: 'dnb',
+      shortLabel: '🎧5: D&B',
+      fullName: 'LIQUID BREAKS',
+      bpm: 180,
       accentColor: '#f59e0b',
-      leadWave: 'sawtooth',
+      leadWave: 'sine',
       bassWave: 'sawtooth',
-      kickStart: 150,
-      hatFreq: 920,
+      kickStart: 185,
+      hatFreq: 1250,
       bassFreqs: [146.83, 293.66, 174.61, 196.0, 220.0, 261.63, 196.0, 174.61],
       melodyFreqs: [587.33, 698.46, 783.99, 880.0, 1046.5, 880.0, 783.99, 698.46],
       beatChords: [
@@ -231,38 +302,15 @@
       ],
     },
     {
-      id: 'kawaii',
-      shortLabel: '🍬4: KAWAII',
-      fullName: 'KAWAII FUTURE',
-      bpm: 175,
-      accentColor: '#f472b6',
-      leadWave: 'sine',
-      bassWave: 'triangle',
-      kickStart: 175,
-      hatFreq: 1280,
-      bassFreqs: [174.61, 174.61, 196.0, 196.0, 164.81, 164.81, 220.0, 130.81],
-      melodyFreqs: [698.46, 880.0, 1046.5, 1318.5, 1174.66, 1046.5, 880.0, 1567.98],
-      beatChords: [
-        [698.46, 880.0, 1046.5, 1318.5],
-        [880.0, 1046.5, 1318.5, 1567.98],
-        [587.33, 783.99, 987.77, 1396.91],
-        [659.25, 783.99, 1174.66, 1567.98],
-        [659.25, 783.99, 987.77, 1479.98],
-        [523.25, 783.99, 987.77, 1318.5],
-        [698.46, 880.0, 1046.5, 1567.98],
-        [783.99, 1046.5, 1318.5, 1760.0],
-      ],
-    },
-    {
-      id: 'rave',
-      shortLabel: '🔥5: RAVE',
-      fullName: 'HYPER RAVE',
-      bpm: 180,
+      id: 'hardcore',
+      shortLabel: '🔥6: J-CORE',
+      fullName: 'HAPPY HARDCORE',
+      bpm: 185,
       accentColor: '#a855f7',
       leadWave: 'sawtooth',
       bassWave: 'square',
-      kickStart: 190,
-      hatFreq: 860,
+      kickStart: 195,
+      hatFreq: 950,
       bassFreqs: [110.0, 220.0, 174.61, 174.61, 130.81, 261.63, 196.0, 164.81],
       melodyFreqs: [880.0, 659.25, 880.0, 1046.5, 987.77, 783.99, 659.25, 1174.66],
       beatChords: [
@@ -321,7 +369,7 @@
   const statTimeEl = document.getElementById('stat-time');
   const statBestEl = document.getElementById('stat-best');
 
-  // --- Audio Synthesizer (Web Audio API) ---
+  // --- Audio Synthesizer & Audio File Player ---
   class SoundManager {
     constructor() {
       this.ctx = null;
@@ -329,6 +377,7 @@
       this.noiseBuffer = null;
       this.muted = false;
       this.volume = 0.8;
+      this.currentBgmAudio = null;
       try {
         const savedVol = localStorage.getItem('hamster_dash_volume_v1');
         if (savedVol !== null) {
@@ -345,6 +394,46 @@
 
     get dest() {
       return this.masterGain || this.ctx.destination;
+    }
+
+    playBgmFile(key, loop = true) {
+      const aud = assets.getSound(key);
+      if (!aud) {
+        this.stopBgmFile();
+        return false;
+      }
+      if (this.currentBgmAudio === aud && !aud.paused) {
+        this.syncBgmVolume();
+        return true;
+      }
+      this.stopBgmFile();
+      aud.loop = loop;
+      aud.volume = Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+      try {
+        aud.currentTime = 0;
+        const p = aud.play();
+        if (p && p.catch) {
+          p.catch(() => {});
+        }
+      } catch (_) {}
+      this.currentBgmAudio = aud;
+      return true;
+    }
+
+    stopBgmFile() {
+      if (this.currentBgmAudio) {
+        try {
+          this.currentBgmAudio.pause();
+          this.currentBgmAudio.currentTime = 0;
+        } catch (_) {}
+        this.currentBgmAudio = null;
+      }
+    }
+
+    syncBgmVolume() {
+      if (this.currentBgmAudio) {
+        this.currentBgmAudio.volume = Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+      }
     }
 
     init() {
@@ -390,6 +479,7 @@
       if (this.masterGain && this.ctx) {
         this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
       }
+      this.syncBgmVolume();
       try {
         localStorage.setItem('hamster_dash_volume_v1', String(this.volume));
       } catch {
@@ -406,6 +496,7 @@
       if (this.masterGain && this.ctx) {
         this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
       }
+      this.syncBgmVolume();
       this.syncVolumeUI();
     }
 
@@ -666,6 +757,9 @@
      */
     playLivingBgmStep(stepIndex) {
       if (this.muted || !this.ctx) return;
+      if (assets.hasSound('living_bgm') && this.currentBgmAudio) {
+        return;
+      }
       const now = this.ctx.currentTime;
       const s = ((stepIndex % 32) + 32) % 32;
 
@@ -738,6 +832,10 @@
      */
     playRhythmBeat(beatIndex, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
+      const trackKey = `rhythm_${(trackIdx % RHYTHM_TRACKS.length) + 1}`;
+      if (assets.hasSound(trackKey) && this.currentBgmAudio) {
+        return;
+      }
       const now = this.ctx.currentTime;
       const b = ((beatIndex % 8) + 8) % 8;
       const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
@@ -1757,6 +1855,7 @@
     countdownTimer = 3.0;
     lastCountdownBeep = 4;
     startBannerTimer = 0;
+    syncRoomBgm();
 
     score = 0;
     combo = 0;
@@ -1858,6 +1957,7 @@
 
   function triggerCrashGameOver(hitObs, reasonText, causeKey) {
     if (state !== 'PLAYING') return;
+    sound.stopBgmFile();
     state = 'DYING';
     deathSlowMoTimer = 1.25;
     deathReason = reasonText;
@@ -1899,6 +1999,7 @@
 
   function triggerTimeUpGameOver(reasonText, isHappy = false, isClear = false) {
     if (state !== 'PLAYING') return;
+    sound.stopBgmFile();
     state = 'DYING';
     deathSlowMoTimer = 0.7;
     deathReason = reasonText;
@@ -2091,6 +2192,7 @@
       currentBeatIndex = 0;
       sound.playRhythmBeat(0, rhythmTrackIndex);
     }
+    syncRoomBgm();
   });
 
   // Step 2 Mode Select Hub -> Tap outside .hub-card -> Return to Step 1 Title Screen!
@@ -2138,6 +2240,7 @@
     sound.init();
     sound.playUIClick();
     isPaused = true;
+    if (sound.currentBgmAudio) sound.currentBgmAudio.pause();
     pauseOpenedTime = Date.now();
     sound.syncVolumeUI();
     if (pauseModal) pauseModal.classList.remove('hidden');
@@ -2148,6 +2251,9 @@
     sound.init();
     sound.playUIClick();
     isPaused = false;
+    if (sound.currentBgmAudio && !sound.muted) {
+      sound.currentBgmAudio.play().catch(() => {});
+    }
     lastTime = performance.now();
     if (pauseModal) pauseModal.classList.add('hidden');
   }
@@ -2222,10 +2328,33 @@
   btnSurvival.addEventListener('click', () => startGame('survival'));
   btnTimeattack.addEventListener('click', () => startGame('timeattack'));
 
+  // Central BGM Sync Controller for Audio Files & Procedural Fallbacks
+  function syncRoomBgm() {
+    sound.init();
+    if (state !== 'MODESELECT' && state !== 'COUNTDOWN' && state !== 'PLAYING') {
+      sound.stopBgmFile();
+      return;
+    }
+    if (roomType === 'rhythm') {
+      const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
+      if (assets.hasSound(trackKey)) {
+        sound.playBgmFile(trackKey, true);
+      } else {
+        sound.stopBgmFile();
+      }
+    } else {
+      if (assets.hasSound('living_bgm')) {
+        sound.playBgmFile('living_bgm', true);
+      } else {
+        sound.stopBgmFile();
+      }
+    }
+  }
+
   // Room Toggle Button: Switch between LIVINGROOM and RHYTHMROOM
   function updateRoomSwitchUI() {
     if (!hubCard) return;
-    const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
+    const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
     if (roomType === 'rhythm') {
       hubCard.classList.add('rhythm-room-active');
       if (roomCurrentBadge) {
@@ -2285,11 +2414,12 @@
         sound.playLivingBgmStep(0);
       }
       updateRoomSwitchUI();
+      syncRoomBgm();
     });
   }
 
   // Center Hamster Tap in Mode Select:
-  // - RHYTHM: Switch between 5 tracks
+  // - RHYTHM: Switch between 6 tracks
   // - LIVING: 5 taps cycle through 'none' -> 'cat' -> 'ice' -> 'none'
   if (hubCenterHamster) {
     hubCenterHamster.addEventListener('click', (e) => {
@@ -2302,6 +2432,7 @@
         currentBeatIndex = 0;
         sound.playRhythmBeat(0, rhythmTrackIndex);
         updateRoomSwitchUI();
+        syncRoomBgm();
       } else {
         hamsterTapPulseTimer = 0.25;
         livingTapCount++;
@@ -2354,6 +2485,7 @@
   function goToTitleScreen() {
     titleEnterTime = performance.now();
     sound.init();
+    sound.stopBgmFile();
     clearTrackPreview();
     sound.playUIClick();
     isPaused = false;
