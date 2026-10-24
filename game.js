@@ -7,6 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
+  const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
   const hud = document.getElementById('hud');
@@ -67,6 +68,15 @@
   const livingOptionTextEl = document.getElementById('living-option-text');
 
   const POP_FONT = '"Mochiy Pop One", "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif';
+
+  function hexToRgba(hex, alpha = 1) {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(236, 72, 153, ${alpha})`;
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16) || 236;
+    const g = parseInt(h.substring(2, 4), 16) || 72;
+    const b = parseInt(h.substring(4, 6), 16) || 153;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   // --- Asset Manager (Custom Image / Sound Loader with Built-in Fallbacks) ---
   class AssetManager {
@@ -191,8 +201,9 @@
   const RHYTHM_TRACKS = [
     {
       id: 'kawaii',
-      shortLabel: '🍬1: KAWAII',
+      shortLabel: '🍬 1: KAWAII EDM',
       fullName: 'KAWAII EDM',
+      genre: 'KAWAII EDM',
       bpm: 160,
       audioOffset: 0.0,
       accentColor: '#ec4899',
@@ -215,8 +226,9 @@
     },
     {
       id: 'eurobeat',
-      shortLabel: '🏎️2: EUROBEAT',
+      shortLabel: '🏎️ 2: EUROBEAT RACER',
       fullName: 'EUROBEAT RACER',
+      genre: 'EUROBEAT',
       bpm: 165,
       accentColor: '#f97316',
       leadWave: 'sawtooth',
@@ -238,8 +250,9 @@
     },
     {
       id: 'techno',
-      shortLabel: '⚡3: TECHNO',
+      shortLabel: '⚡ 3: CYBER TECHNO',
       fullName: 'CYBER TECHNO',
+      genre: 'CYBER TECHNO',
       bpm: 170,
       accentColor: '#06b6d4',
       leadWave: 'square',
@@ -261,8 +274,9 @@
     },
     {
       id: 'chiptune',
-      shortLabel: '🕹️4: 8BIT',
-      fullName: '8BIT ARCADE',
+      shortLabel: '🕹️ 4: 8BIT CHIPTUNE',
+      fullName: '8BIT CHIPTUNE',
+      genre: '8BIT CHIPTUNE',
       bpm: 175,
       accentColor: '#38bdf8',
       leadWave: 'square',
@@ -284,8 +298,9 @@
     },
     {
       id: 'dnb',
-      shortLabel: '🎧5: D&B',
-      fullName: 'LIQUID BREAKS',
+      shortLabel: '🎧 5: DRUM & BASS',
+      fullName: 'LIQUID DRUM & BASS',
+      genre: 'DRUM & BASS',
       bpm: 180,
       accentColor: '#f59e0b',
       leadWave: 'sine',
@@ -307,8 +322,9 @@
     },
     {
       id: 'hardcore',
-      shortLabel: '🔥6: J-CORE',
-      fullName: 'HAPPY HARDCORE',
+      shortLabel: '🔥 6: HAPPY HARDCORE',
+      fullName: 'HAPPY HARDCORE (J-CORE)',
+      genre: 'HAPPY HARDCORE',
       bpm: 185,
       accentColor: '#a855f7',
       leadWave: 'sawtooth',
@@ -382,6 +398,14 @@
       this.muted = false;
       this.volume = 0.8;
       this.currentBgmAudio = null;
+      this.currentBgmKey = null;
+      this.playerA = null;
+      this.playerB = null;
+      this.activeSlot = 'a';
+      this.crossfading = false;
+      this.crossfadeProgress = 0;
+      this.crossfadeDuration = 1.4; // 1.4s smooth musical crossfade
+      this.bgmLoopEnabled = true;
       try {
         const savedVol = localStorage.getItem('hamster_dash_volume_v1');
         if (savedVol !== null) {
@@ -400,43 +424,123 @@
       return this.masterGain || this.ctx.destination;
     }
 
+    getTargetBgmVolume() {
+      return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+    }
+
     playBgmFile(key, loop = true, startOffset = 0) {
-      const aud = assets.getSound(key);
-      if (!aud) {
+      const primary = assets.getSound(key);
+      if (!primary) {
         this.stopBgmFile();
         return false;
       }
-      if (this.currentBgmAudio === aud && !aud.paused) {
+      if (this.currentBgmKey === key && this.currentBgmAudio && !this.currentBgmAudio.paused) {
         this.syncBgmVolume();
         return true;
       }
       this.stopBgmFile();
-      aud.loop = loop;
-      aud.volume = Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+      this.currentBgmKey = key;
+      this.bgmLoopEnabled = loop;
+      this.crossfading = false;
+      this.crossfadeProgress = 0;
+
+      this.activeSlot = 'a';
+      this.playerA = primary;
+      const src = primary.src || `assets/sounds/${key}.mp3`;
+      if (!this.playerB || this.playerB._key !== key) {
+        this.playerB = new Audio(src);
+        this.playerB.preload = 'auto';
+        this.playerB._key = key;
+      }
+
+      this.playerA.loop = false; // 手動のシームレス・クロスフェードループで無音ギャップを完全解消
+      this.playerB.loop = false;
+
+      const targetVol = this.getTargetBgmVolume();
+      this.playerA.volume = targetVol;
+      this.playerB.volume = 0;
       try {
-        aud.currentTime = Math.max(0, startOffset);
-        const p = aud.play();
-        if (p && p.catch) {
-          p.catch(() => {});
-        }
+        this.playerA.currentTime = Math.max(0, startOffset);
+        const p = this.playerA.play();
+        if (p && p.catch) p.catch(() => {});
       } catch (_) {}
-      this.currentBgmAudio = aud;
+      this.currentBgmAudio = this.playerA;
       return true;
     }
 
-    stopBgmFile() {
-      if (this.currentBgmAudio) {
+    updateBgmLoop(dt) {
+      if (!this.bgmLoopEnabled || !this.currentBgmKey) return;
+      const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
+      const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
+      if (!active || !active.duration || active.paused) return;
+
+      const dur = active.duration;
+      const cur = active.currentTime;
+      const triggerTime = Math.max(0, dur - this.crossfadeDuration);
+
+      if (!this.crossfading && cur >= triggerTime && cur < dur) {
+        this.crossfading = true;
+        this.crossfadeProgress = 0;
         try {
-          this.currentBgmAudio.pause();
-          this.currentBgmAudio.currentTime = 0;
+          standby.currentTime = 0;
+          standby.volume = 0;
+          const p = standby.play();
+          if (p && p.catch) p.catch(() => {});
         } catch (_) {}
-        this.currentBgmAudio = null;
+      }
+
+      if (this.crossfading) {
+        this.crossfadeProgress += dt / this.crossfadeDuration;
+        const targetVol = this.getTargetBgmVolume();
+        const p = Math.max(0, Math.min(1, this.crossfadeProgress));
+
+        active.volume = targetVol * (1 - p);
+        standby.volume = targetVol * p;
+
+        if (p >= 1.0 || active.ended) {
+          try {
+            active.pause();
+            active.currentTime = 0;
+          } catch (_) {}
+          this.activeSlot = this.activeSlot === 'a' ? 'b' : 'a';
+          this.currentBgmAudio = standby;
+          standby.volume = targetVol;
+          this.crossfading = false;
+          this.crossfadeProgress = 0;
+        }
       }
     }
 
+    stopBgmFile() {
+      if (this.playerA) {
+        try {
+          this.playerA.pause();
+          this.playerA.currentTime = 0;
+        } catch (_) {}
+      }
+      if (this.playerB) {
+        try {
+          this.playerB.pause();
+          this.playerB.currentTime = 0;
+        } catch (_) {}
+      }
+      this.currentBgmAudio = null;
+      this.currentBgmKey = null;
+      this.crossfading = false;
+      this.crossfadeProgress = 0;
+    }
+
     syncBgmVolume() {
-      if (this.currentBgmAudio) {
-        this.currentBgmAudio.volume = Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+      const targetVol = this.getTargetBgmVolume();
+      if (!this.crossfading) {
+        if (this.playerA && this.activeSlot === 'a') this.playerA.volume = targetVol;
+        if (this.playerB && this.activeSlot === 'b') this.playerB.volume = targetVol;
+      } else {
+        const p = Math.max(0, Math.min(1, this.crossfadeProgress));
+        const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
+        const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
+        if (active) active.volume = targetVol * (1 - p);
+        if (standby) standby.volume = targetVol * p;
       }
     }
 
@@ -543,19 +647,57 @@
     playDash(isPoisoned = false) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
+      const pitchMult = isPoisoned ? 0.65 : 1.0;
+
+      // 1. High-energy cute whoosh zip (punchy sweeping sine/triangle)
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'triangle';
-      const startF = isPoisoned ? 180 : 320;
-      const endF = isPoisoned ? 310 : 920;
+      const startF = 380 * pitchMult;
+      const peakF = 1280 * pitchMult;
+      const endF = 460 * pitchMult;
       osc.frequency.setValueAtTime(startF, now);
-      osc.frequency.exponentialRampToValueAtTime(endF, now + 0.085);
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+      osc.frequency.exponentialRampToValueAtTime(peakF, now + 0.045);
+      osc.frequency.exponentialRampToValueAtTime(endF, now + 0.12);
+      gain.gain.setValueAtTime(0.40, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.135);
       osc.connect(gain);
       gain.connect(this.dest);
       osc.start(now);
-      osc.stop(now + 0.095);
+      osc.stop(now + 0.14);
+
+      // 2. Filtered speed aero whoosh (wind puff that cuts through)
+      if (this.noiseBuffer) {
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1600 * pitchMult, now);
+        filter.frequency.exponentialRampToValueAtTime(3200 * pitchMult, now + 0.035);
+        filter.frequency.exponentialRampToValueAtTime(800 * pitchMult, now + 0.11);
+        filter.Q.setValueAtTime(2.2, now);
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.32, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.115);
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(this.dest);
+        noise.start(now);
+        noise.stop(now + 0.12);
+      }
+
+      // 3. Tactile sub punch transient (feels satisfying and physical)
+      const sub = this.ctx.createOscillator();
+      const sGain = this.ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(170 * pitchMult, now);
+      sub.frequency.exponentialRampToValueAtTime(42 * pitchMult, now + 0.06);
+      sGain.gain.setValueAtTime(0.28, now);
+      sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+      sub.connect(sGain);
+      sGain.connect(this.dest);
+      sub.start(now);
+      sub.stop(now + 0.07);
     }
 
     playEat(combo = 1, isSpecial = false) {
@@ -947,59 +1089,75 @@
     }
 
     /**
-     * Simple, crisp Rimshot / K-Snare percussion when dashing on the beat in RHYTHM ROOM!
-     * Woody rim knock + high-passed tight K-snare snap (no chord stabs that clash with BGM).
+     * Punchy, satisfying arcade rhythm strike for RHYTHM ROOM!
+     * Layered laser whip, crisp acoustic rim body, snapping noise burst, and harmonized musical chime!
      */
     playRhythmDash(beatIndex = 0, isPoisoned = false, trackIdx = 0) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
-      const pitchMult = isPoisoned ? 0.68 : 1.0;
+      const pitchMult = isPoisoned ? 0.72 : 1.0;
+      const track = RHYTHM_TRACKS[trackIdx % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
 
-      // 1. Rimshot woody shell transient (tight pitch drop)
-      const rimBody = this.ctx.createOscillator();
-      const rbGain = this.ctx.createGain();
-      rimBody.type = 'triangle';
-      rimBody.frequency.setValueAtTime(480 * pitchMult, now);
-      rimBody.frequency.exponentialRampToValueAtTime(175 * pitchMult, now + 0.032);
-      rbGain.gain.setValueAtTime(0.32, now);
-      rbGain.gain.exponentialRampToValueAtTime(0.001, now + 0.042);
-      rimBody.connect(rbGain);
-      rbGain.connect(this.dest);
-      rimBody.start(now);
-      rimBody.stop(now + 0.045);
+      // 1. Razor-sharp EDM Laser Zap / Synth Whip (Cuts through heavy beats!)
+      const zap = this.ctx.createOscillator();
+      const zGain = this.ctx.createGain();
+      zap.type = 'sawtooth';
+      zap.frequency.setValueAtTime(2600 * pitchMult, now);
+      zap.frequency.exponentialRampToValueAtTime(380 * pitchMult, now + 0.055);
+      zGain.gain.setValueAtTime(0.44, now);
+      zGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+      zap.connect(zGain);
+      zGain.connect(this.dest);
+      zap.start(now);
+      zap.stop(now + 0.08);
 
-      // 2. Metallic rim click overtone ("カッ" attack)
-      const rimClick = this.ctx.createOscillator();
-      const rcGain = this.ctx.createGain();
-      rimClick.type = 'sine';
-      rimClick.frequency.setValueAtTime(1760 * pitchMult, now);
-      rimClick.frequency.exponentialRampToValueAtTime(840 * pitchMult, now + 0.018);
-      rcGain.gain.setValueAtTime(0.24, now);
-      rcGain.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
-      rimClick.connect(rcGain);
-      rcGain.connect(this.dest);
-      rimClick.start(now);
-      rimClick.stop(now + 0.025);
+      // 2. Punchy Rimshot / Wood Shell Body (Tactile knock)
+      const rim = this.ctx.createOscillator();
+      const rGain = this.ctx.createGain();
+      rim.type = 'triangle';
+      rim.frequency.setValueAtTime(560 * pitchMult, now);
+      rim.frequency.exponentialRampToValueAtTime(180 * pitchMult, now + 0.05);
+      rGain.gain.setValueAtTime(0.38, now);
+      rGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      rim.connect(rGain);
+      rGain.connect(this.dest);
+      rim.start(now);
+      rim.stop(now + 0.065);
 
-      // 3. K-Snare crisp high-mid noise burst ("ツッ / タッ" snare wire snap)
+      // 3. Crisp High-Mid Clap / Snare Noise Snap
       if (this.noiseBuffer) {
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.noiseBuffer;
-
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(isPoisoned ? 1200 : 2600, now);
-        filter.Q.setValueAtTime(1.8, now);
-
+        filter.frequency.setValueAtTime(isPoisoned ? 1400 : 2600, now);
+        filter.Q.setValueAtTime(2.0, now);
         const nGain = this.ctx.createGain();
-        nGain.gain.setValueAtTime(0.34, now);
-        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.062);
-
+        nGain.gain.setValueAtTime(0.40, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
         noise.connect(filter);
         filter.connect(nGain);
         nGain.connect(this.dest);
         noise.start(now);
-        noise.stop(now + 0.068);
+        noise.stop(now + 0.09);
+      }
+
+      // 4. Harmonized Musical Chime (Tied to the track's melody scale!)
+      const b = ((beatIndex % 8) + 8) % 8;
+      const chord = (track.beatChords && track.beatChords[b]) || [523.25, 659.25, 783.99];
+      const noteFreq = chord[chord.length - 1] * pitchMult;
+      if (noteFreq > 0) {
+        const chime = this.ctx.createOscillator();
+        const cGain = this.ctx.createGain();
+        chime.type = 'sine';
+        chime.frequency.setValueAtTime(noteFreq, now);
+        chime.frequency.exponentialRampToValueAtTime(noteFreq * 1.5, now + 0.07);
+        cGain.gain.setValueAtTime(0.24, now);
+        cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        chime.connect(cGain);
+        cGain.connect(this.dest);
+        chime.start(now);
+        chime.stop(now + 0.085);
       }
     }
 
@@ -2244,7 +2402,8 @@
     sound.init();
     sound.playUIClick();
     isPaused = true;
-    if (sound.currentBgmAudio) sound.currentBgmAudio.pause();
+    if (sound.playerA) sound.playerA.pause();
+    if (sound.playerB) sound.playerB.pause();
     pauseOpenedTime = Date.now();
     sound.syncVolumeUI();
     if (pauseModal) pauseModal.classList.remove('hidden');
@@ -2255,8 +2414,11 @@
     sound.init();
     sound.playUIClick();
     isPaused = false;
-    if (sound.currentBgmAudio && !sound.muted) {
-      sound.currentBgmAudio.play().catch(() => {});
+    if (!sound.muted) {
+      const active = sound.activeSlot === 'a' ? sound.playerA : sound.playerB;
+      const standby = sound.activeSlot === 'a' ? sound.playerB : sound.playerA;
+      if (active) active.play().catch(() => {});
+      if (sound.crossfading && standby) standby.play().catch(() => {});
     }
     lastTime = performance.now();
     if (pauseModal) pauseModal.classList.add('hidden');
@@ -2363,7 +2525,7 @@
     if (roomType === 'rhythm') {
       hubCard.classList.add('rhythm-room-active');
       if (roomCurrentBadge) {
-        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName})`;
+        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName} / BPM${track.bpm})`;
       }
       if (hubSubText) {
         hubSubText.innerHTML = 'リズムに合わせて高速移動‼ <span class="rhythm-sound-note">※音あり推奨</span>';
@@ -2373,9 +2535,10 @@
       if (rhythmTrackBadge) {
         rhythmTrackBadge.classList.remove('hidden');
         rhythmTrackBadge.style.borderColor = track.accentColor;
+        rhythmTrackBadge.style.boxShadow = `0 4px 14px ${hexToRgba(track.accentColor, 0.45)}`;
       }
       if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
-      if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆曲変更`;
+      if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆タップで曲変更`;
       if (livingOptionBadge) livingOptionBadge.classList.add('hidden');
     } else {
       hubCard.classList.remove('rhythm-room-active');
@@ -2605,6 +2768,23 @@
         currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
         rhythmBeatPulse = 1.0;
         sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
+      }
+    }
+
+    // Dynamic rhythm-reactive outer frame glow on #game-container
+    if (roomType === 'rhythm') {
+      rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.2);
+      if (gameContainer) {
+        const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+        const accent = track.accentColor || '#ec4899';
+        const glowR = Math.round(8 + rhythmBeatPulse * 28);
+        const borderA = (0.35 + rhythmBeatPulse * 0.65).toFixed(2);
+        const glowA = (0.2 + rhythmBeatPulse * 0.6).toFixed(2);
+        gameContainer.style.boxShadow = `0 0 0 3.5px ${hexToRgba(accent, borderA)}, 0 0 ${glowR}px ${hexToRgba(accent, glowA)}, 0 20px 60px rgba(0, 0, 0, 0.65)`;
+      }
+    } else {
+      if (gameContainer && gameContainer.style.boxShadow) {
+        gameContainer.style.boxShadow = '';
       }
     }
 
@@ -3407,10 +3587,53 @@
 
     ctx.save();
 
-    // Outer perimeter rhythm track
-    ctx.strokeStyle = `rgba(147, 51, 234, ${0.32 + rhythmBeatPulse * 0.28})`;
-    ctx.lineWidth = 5;
+    const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
+    const accent = track.accentColor || '#ec4899';
+
+    // 0. Outer perimeter neon frame: breathes and flashes in sync with the beat!
+    ctx.save();
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 10 + rhythmBeatPulse * 26;
+    ctx.strokeStyle = hexToRgba(accent, 0.45 + rhythmBeatPulse * 0.55);
+    ctx.lineWidth = 4 + rhythmBeatPulse * 4;
     ctx.strokeRect(rx, ry, rw, rh);
+
+    // Inner bright neon line
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = hexToRgba('#ffffff', 0.4 + rhythmBeatPulse * 0.5);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rx, ry, rw, rh);
+
+    // Dynamic Corner L-Brackets that pulse brightly with the rhythm
+    const cornerArm = 22 + rhythmBeatPulse * 6;
+    ctx.strokeStyle = rhythmBeatPulse > 0.15 ? '#fde047' : accent;
+    ctx.lineWidth = 4.5 + rhythmBeatPulse * 2.5;
+    ctx.lineCap = 'square';
+    // Top-Left
+    ctx.beginPath();
+    ctx.moveTo(rx, ry + cornerArm);
+    ctx.lineTo(rx, ry);
+    ctx.lineTo(rx + cornerArm, ry);
+    ctx.stroke();
+    // Top-Right
+    ctx.beginPath();
+    ctx.moveTo(rx + rw - cornerArm, ry);
+    ctx.lineTo(rx + rw);
+    ctx.lineTo(rx + rw, ry + cornerArm);
+    ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath();
+    ctx.moveTo(rx + rw, ry + rh - cornerArm);
+    ctx.lineTo(rx + rw, ry + rh);
+    ctx.lineTo(rx + rw - cornerArm, ry + rh);
+    ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath();
+    ctx.moveTo(rx + cornerArm, ry + rh);
+    ctx.lineTo(rx, ry + rh);
+    ctx.lineTo(rx, ry + rh - cornerArm);
+    ctx.stroke();
+    ctx.restore();
 
     const beatInterval = getRhythmBeatInterval();
     const frac = state === 'PLAYING' ? clamp(rhythmTimer / beatInterval, 0, 1) : 0;
@@ -6640,6 +6863,7 @@
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
+    sound.updateBgmLoop(dt);
     update(dt);
     render();
     renderMenuCanvases(now);

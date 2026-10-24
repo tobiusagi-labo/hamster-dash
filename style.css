@@ -50,6 +50,7 @@ html, body {
   background: #1e1b18;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 0 0 6px #453526;
+  transition: box-shadow 0.08s ease-out;
   -webkit-tap-highlight-color: transparent !important;
   -webkit-touch-callout: none !important;
   touch-action: none;
@@ -704,14 +705,17 @@ html, body {
   background: linear-gradient(135deg, #581c87, #3b0764);
   border: 2px solid #f472b6;
   border-radius: 12px;
-  padding: 3px 6px;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  box-shadow: 0 3px 8px rgba(147, 51, 234, 0.35);
-  width: 104px;
+  justify-content: center;
+  gap: 1.5px;
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.45);
+  min-width: 126px;
+  max-width: 142px;
   pointer-events: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .living-option-badge {
@@ -748,19 +752,22 @@ html, body {
 }
 
 .rhythm-track-name {
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 900;
   color: #fde047;
   white-space: nowrap;
-  line-height: 1.15;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .rhythm-track-bpm {
-  font-size: 7.5px;
+  font-size: 8px;
   font-weight: 800;
   color: #fbcfe8;
   white-space: nowrap;
-  line-height: 1.15;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .hub-mode-icon-btn {
