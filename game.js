@@ -64,8 +64,9 @@
   const rhythmTrackBadge = document.getElementById('rhythm-track-badge');
   const rhythmTrackNameEl = document.getElementById('rhythm-track-name');
   const rhythmTrackBpmEl = document.getElementById('rhythm-track-bpm');
-  const livingOptionBadge = document.getElementById('living-option-badge');
-  const livingOptionTextEl = document.getElementById('living-option-text');
+  const livingTrackBadge = document.getElementById('living-track-badge');
+  const livingTrackNameEl = document.getElementById('living-track-name');
+  const livingTrackBpmEl = document.getElementById('living-track-bpm');
 
   const POP_FONT = '"Mochiy Pop One", "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif';
 
@@ -127,6 +128,7 @@
     initSoundLoaders() {
       const soundFiles = {
         living_bgm: 'assets/sounds/living_bgm.mp3',
+        living_bgm2: 'assets/sounds/living_bgm2.mp3',
         rhythm_1: 'assets/sounds/rhythm_1.mp3',
         rhythm_2: 'assets/sounds/rhythm_2.mp3',
         rhythm_3: 'assets/sounds/rhythm_3.mp3',
@@ -137,8 +139,8 @@
 
       for (const [key, src] of Object.entries(soundFiles)) {
         const aud = new Audio();
-        // living_bgm and rhythm_1 are preloaded for immediate readiness; others load on demand to avoid choking mobile bandwidth
-        aud.preload = (key === 'living_bgm' || key === 'rhythm_1') ? 'auto' : 'none';
+        // living_bgm, living_bgm2 and rhythm_1 are preloaded for immediate readiness; others load on demand
+        aud.preload = (key.startsWith('living_bgm') || key === 'rhythm_1') ? 'auto' : 'none';
         aud.src = src;
         this.sounds[key] = aud;
         aud.addEventListener('loadedmetadata', () => {
@@ -190,6 +192,23 @@
   }
 
   const assets = new AssetManager();
+
+  // --- 2 Selectable LIVING ROOM Tracks ---
+  const LIVING_TRACKS = [
+    {
+      id: 'living_bgm',
+      title: 'COZY LIVING',
+      shortLabel: '1: COZY LIVING',
+      bpm: 118,
+    },
+    {
+      id: 'living_bgm2',
+      title: 'SUNNY DAY',
+      shortLabel: '2: SUNNY DAY',
+      bpm: 122,
+    },
+  ];
+  let livingTrackIndex = 0;
 
   // --- 6 Selectable RHYTHM ROOM Tracks (Different Genres, BPM 160~185) ---
   const RHYTHM_TRACKS = [
@@ -419,7 +438,9 @@
     }
 
     getTargetBgmVolume() {
-      return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
+      const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
+      const baseRatio = isRhythm ? 0.40 : 0.80; // リズムモードのBGM音量のみ現在の約50%に抑制
+      return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * baseRatio));
     }
 
     playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
@@ -2523,8 +2544,9 @@
         sound.stopBgmFile();
       }
     } else {
-      if (assets.hasSound('living_bgm')) {
-        sound.playBgmFile('living_bgm', true, 0, forceRestart);
+      const livingTrack = LIVING_TRACKS[livingTrackIndex % LIVING_TRACKS.length] || LIVING_TRACKS[0];
+      if (assets.hasSound(livingTrack.id)) {
+        sound.playBgmFile(livingTrack.id, true, 0, forceRestart);
       } else {
         sound.stopBgmFile();
       }
@@ -2534,11 +2556,11 @@
   // Room Toggle & Switch: Switch between LIVINGROOM and RHYTHMROOM
   function updateRoomSwitchUI() {
     if (!hubCard) return;
-    const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
     if (roomType === 'rhythm') {
+      const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
       hubCard.classList.add('rhythm-room-active');
       if (roomCurrentBadge) {
-        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.fullName} / BPM${track.bpm})`;
+        roomCurrentBadge.textContent = `🎵 RHYTHM ROOM (${track.shortLabel})`;
       }
       if (hubSubText) {
         hubSubText.innerHTML = 'リズムに合わせて高速移動‼ <span class="rhythm-sound-note">※音あり推奨</span>';
@@ -2558,13 +2580,13 @@
       }
       if (rhythmTrackNameEl) rhythmTrackNameEl.textContent = track.shortLabel;
       if (rhythmTrackBpmEl) rhythmTrackBpmEl.textContent = `BPM${track.bpm} 👆タップで曲変更`;
-      if (livingOptionBadge) livingOptionBadge.classList.add('hidden');
+      if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
     } else {
+      const livingTrack = LIVING_TRACKS[livingTrackIndex % LIVING_TRACKS.length] || LIVING_TRACKS[0];
       hubCard.classList.remove('rhythm-room-active');
-      let livingTitle = '🏠 LIVING ROOM';
-      if (livingOption === 'cat') livingTitle = '🏠 LIVING ROOM (Cat+)';
-      else if (livingOption === 'ice') livingTitle = '🏠 LIVING ROOM (Ice+)';
-      if (roomCurrentBadge) roomCurrentBadge.textContent = livingTitle;
+      if (roomCurrentBadge) {
+        roomCurrentBadge.textContent = `🏠 LIVING ROOM (${livingTrack.shortLabel})`;
+      }
       if (hubSubText) hubSubText.textContent = '画面タップの位置に高速移動！';
       if (pillLiving) {
         pillLiving.classList.add('active');
@@ -2575,18 +2597,10 @@
         pillRhythm.setAttribute('aria-selected', 'false');
       }
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
-
-      if (livingOptionBadge) {
-        if (livingOption === 'cat') {
-          livingOptionBadge.classList.remove('hidden', 'ice-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+';
-        } else if (livingOption === 'ice') {
-          livingOptionBadge.classList.remove('hidden');
-          livingOptionBadge.classList.add('ice-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+';
-        } else {
-          livingOptionBadge.classList.add('hidden');
-        }
+      if (livingTrackBadge) {
+        livingTrackBadge.classList.remove('hidden');
+        if (livingTrackNameEl) livingTrackNameEl.textContent = livingTrack.shortLabel;
+        if (livingTrackBpmEl) livingTrackBpmEl.textContent = `BPM${livingTrack.bpm} 👆タップで曲変更`;
       }
     }
   }
@@ -2646,9 +2660,18 @@
     });
   }
 
+  function changeLivingTrack(delta = 1) {
+    sound.init();
+    livingTrackIndex = (livingTrackIndex + delta + LIVING_TRACKS.length) % LIVING_TRACKS.length;
+    hamsterTapPulseTimer = 0.36;
+    sound.playUIClick();
+    updateRoomSwitchUI();
+    syncRoomBgm();
+  }
+
   // Center Hamster Tap & Track Badge Tap in Mode Select:
-  // - RHYTHM: Tap hamster illustration to cycle through 6 tracks!
-  // - LIVING: 5 taps cycle through 'none' -> 'cat' -> 'ice' -> 'none'
+  // - RHYTHM: Tap hamster illustration or badge to cycle through 6 tracks!
+  // - LIVING: Tap hamster illustration or badge to cycle through 2 living tracks!
   if (rhythmTrackBadge) {
     rhythmTrackBadge.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2656,31 +2679,20 @@
     });
   }
 
-  // Center Hamster Tap in Mode Select:
-  // - RHYTHM: Switch between 6 tracks with dynamic accessory change
-  // - LIVING: 5 taps cycle through 'none' -> 'cat' -> 'ice' -> 'none'
+  if (livingTrackBadge) {
+    livingTrackBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      changeLivingTrack(1);
+    });
+  }
+
   if (hubCenterHamster) {
     hubCenterHamster.addEventListener('click', (e) => {
       sound.init();
       if (roomType === 'rhythm') {
         changeRhythmTrack(1);
       } else {
-        hamsterTapPulseTimer = 0.25;
-        livingTapCount++;
-        if (livingTapCount >= 5) {
-          livingTapCount = 0;
-          if (livingOption === 'none') {
-            livingOption = 'cat';
-          } else if (livingOption === 'cat') {
-            livingOption = 'ice';
-          } else {
-            livingOption = 'none';
-          }
-          sound.playCountdown(true); // ポップな通知音
-        } else {
-          sound.playUIClick();
-        }
-        updateRoomSwitchUI();
+        changeLivingTrack(1);
       }
     });
   }
@@ -4922,46 +4934,28 @@
     hCtx.rotate(tilt);
     hCtx.scale(tapScale, tapScale);
 
-    // Custom hub standing hamster image override for LIVING ROOM
+    // Custom hub standing hamster image override for LIVING ROOM (Sunflower Seed Hamster)
     if (roomType === 'living' && assets.hasImage('hub_hamster')) {
       const img = assets.getImage('hub_hamster');
-      let dw = 146;
-      let dh = 134;
+      let dw = 144;
+      let dh = 144;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dw = 146;
-        dh = dw / aspect;
-        if (dh > 154) {
-          dh = 154;
-          dw = dh * aspect;
+        dh = 148;
+        dw = dh * aspect;
+        if (dw > 146) {
+          dw = 146;
+          dh = dw / aspect;
         }
       }
 
-      // Soft ground shadow under martial-arts kung-fu stance
+      // Soft ground shadow under hamster
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 62 - bounce * 0.35, 46, 10, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 62 - bounce * 0.35, 42, 9.5, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
-
-      // Living Room Secret Option Enhancements:
-      if (livingOption === 'cat') {
-        // Cute playful cat paw badge and ears
-        hCtx.font = '18px sans-serif';
-        hCtx.textAlign = 'center';
-        hCtx.textBaseline = 'middle';
-        const pawBob = Math.sin(now * 0.008) * 3;
-        hCtx.fillText('🐾', 46, -38 + pawBob);
-      } else if (livingOption === 'ice') {
-        // Frosty winter sparkles and snowflakes
-        hCtx.font = '16px sans-serif';
-        hCtx.textAlign = 'center';
-        hCtx.textBaseline = 'middle';
-        const iceBob = Math.sin(now * 0.007) * 3;
-        hCtx.fillText('❄️', 46, -38 + iceBob);
-        hCtx.fillText('✨', -46, -36 - iceBob);
-      }
 
       hCtx.restore();
       return;

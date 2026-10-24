@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=14" />
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -85,21 +85,31 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.3.1</div>
+          <div class="title-version-badge">ver 1.4.0</div>
         </div>
       </div>
 
       <!-- Step 2: Mode Select Hub Overlay (Tap outside .hub-card to return to Title Screen) -->
       <div id="mode-select-screen" class="overlay hidden">
         <div class="hub-card" id="hub-card">
-          <!-- Top: モード選択の文字 -->
-          <div class="hub-top-header">
-            <div class="room-current-badge" id="room-current-badge">🏠 LIVING ROOM</div>
-            <h2 class="hub-title">モード選択</h2>
-            <p class="hub-sub" id="hub-sub-text">画面タップの位置に高速移動！</p>
+          <!-- 1. ルーム選択切り替えボタン -->
+          <div class="hub-room-switch-row">
+            <div class="room-switch-btn" id="btn-room-toggle">
+              <button class="room-switch-pill active" id="pill-living" type="button">🏠 LIVINGROOM</button>
+              <span class="room-switch-arrow">⇄</span>
+              <button class="room-switch-pill" id="pill-rhythm" type="button">🎵 RHYTHMROOM</button>
+            </div>
           </div>
 
-          <!-- Middle Row: Large Left Mode Icon | Compact Front Whole-Body Hamster | Large Right Mode Icon -->
+          <!-- 2. ルーム名（必ず一行できれいに収める） -->
+          <div class="hub-room-title-row">
+            <div class="room-current-badge" id="room-current-badge">🏠 LIVING ROOM</div>
+          </div>
+
+          <!-- 3. 説明 -->
+          <p class="hub-sub" id="hub-sub-text">画面タップの位置に高速移動！</p>
+
+          <!-- 4. モード選択ボタンと間にハムスターイラスト -->
           <div class="hub-middle-row">
             <button class="hub-mode-icon-btn survival-theme" id="btn-survival">
               <div class="hub-icon-circle">🔥</div>
@@ -113,8 +123,9 @@
                 <span class="rhythm-track-name" id="rhythm-track-name">🍬 1: KAWAII EDM</span>
                 <span class="rhythm-track-bpm" id="rhythm-track-bpm">BPM160 👆タップで曲変更</span>
               </div>
-              <div class="living-option-badge hidden" id="living-option-badge">
-                <span class="living-option-text" id="living-option-text">🐾 Cat+</span>
+              <div class="living-track-badge" id="living-track-badge">
+                <span class="living-track-name" id="living-track-name">🏠 1: COZY LIVING</span>
+                <span class="living-track-bpm" id="living-track-bpm">BPM118 👆タップで曲変更</span>
               </div>
             </div>
 
@@ -125,7 +136,7 @@
             </button>
           </div>
 
-          <!-- Bottom: 遊び方アイコン & 記録・集計アイコン -->
+          <!-- 5. 遊び方と記録・集計 -->
           <div class="hub-bottom-row">
             <button class="sub-hub-btn" id="btn-howto">
               <span class="sub-hub-icon">📖</span>
@@ -135,15 +146,6 @@
               <span class="sub-hub-icon">📊</span>
               <span class="sub-hub-text">記録・集計</span>
             </button>
-          </div>
-
-          <!-- Room Switcher Button at the bottom of Mode Select -->
-          <div class="hub-room-switch-row">
-            <div class="room-switch-btn" id="btn-room-toggle">
-              <button class="room-switch-pill active" id="pill-living" type="button">🏠 LIVINGROOM</button>
-              <span class="room-switch-arrow">⇄</span>
-              <button class="room-switch-pill" id="pill-rhythm" type="button">🎵 RHYTHMROOM</button>
-            </div>
           </div>
         </div>
       </div>
@@ -327,6 +329,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=14"></script>
+  <script src="game.js?v=15"></script>
 </body>
 </html>

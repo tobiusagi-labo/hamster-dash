@@ -605,20 +605,32 @@ html, body {
 }
 
 .hub-top-header {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+}
+
+.hub-room-title-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
 }
 
 .room-current-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #ffffff;
-  font-size: 10.5px;
+  font-size: clamp(11.5px, 3.2vw, 13.5px);
   font-weight: 900;
-  letter-spacing: 0.08em;
-  padding: 3px 12px;
+  letter-spacing: 0.04em;
+  padding: 4px 14px;
   border-radius: 999px;
-  margin-bottom: 4px;
-  box-shadow: 0 2px 6px rgba(180, 83, 9, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.28);
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
@@ -644,19 +656,19 @@ html, body {
 
 .rhythm-sound-note {
   display: inline-block;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 900;
   color: #db2777;
   background: rgba(244, 114, 182, 0.18);
   border: 1px solid rgba(219, 39, 119, 0.35);
   border-radius: 6px;
-  padding: 1px 6px;
+  padding: 1px 5px;
   margin-left: 4px;
   vertical-align: middle;
 }
 
 .hub-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
   color: #92400e;
   letter-spacing: 0.06em;
@@ -664,10 +676,12 @@ html, body {
 }
 
 .hub-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: #b45309;
-  margin-top: 2px;
+  margin-top: 0;
+  margin-bottom: 12px;
+  white-space: nowrap;
 }
 
 /* Middle Row: Large Left Icon | Smaller Front Hamster | Large Right Icon */
@@ -713,9 +727,50 @@ html, body {
   gap: 1.5px;
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.45);
   min-width: 126px;
-  max-width: 142px;
-  pointer-events: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  max-width: 146px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.rhythm-track-badge:active {
+  transform: scale(0.95);
+}
+
+.living-track-badge {
+  margin-top: -4px;
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  border: 2px solid #fde047;
+  border-radius: 12px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5px;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.38);
+  min-width: 126px;
+  max-width: 146px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.living-track-badge:active {
+  transform: scale(0.95);
+}
+
+.living-track-name {
+  font-size: 9.5px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.living-track-bpm {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #fef08a;
+  white-space: nowrap;
 }
 
 .living-option-badge {
@@ -879,7 +934,8 @@ html, body {
 
 /* Room Switcher Row (LIVINGROOM <-> RHYTHMROOM) */
 .hub-room-switch-row {
-  margin-top: 12px;
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 
 .room-switch-btn {
