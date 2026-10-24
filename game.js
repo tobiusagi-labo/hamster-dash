@@ -3922,26 +3922,56 @@
   function drawVacuum() {
     if (!vacuum) return;
     const now = performance.now();
+    const isRhythm = roomType === 'rhythm';
 
     ctx.save();
     ctx.translate(vacuum.x, vacuum.y);
 
     const suckPulse = 1 - ((now * 0.0022) % 1);
-    ctx.strokeStyle = `rgba(148, 163, 184, ${suckPulse * 0.45})`;
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.arc(0, 0, vacuum.radius + suckPulse * 20, 0, Math.PI * 2);
-    ctx.stroke();
+    const rgbHue = (now * 0.18) % 360;
+
+    if (isRhythm) {
+      // Gaming RGB Suction Aura Pulse
+      const auraHue = (rgbHue + 60) % 360;
+      ctx.strokeStyle = `hsla(${auraHue}, 100%, 70%, ${suckPulse * 0.65})`;
+      ctx.shadowColor = `hsl(${auraHue}, 100%, 65%)`;
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius + suckPulse * 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = `rgba(148, 163, 184, ${suckPulse * 0.45})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius + suckPulse * 20, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     if (vacuum.suckAnimTimer > 0) {
       const s = 1 + Math.sin(vacuum.suckAnimTimer * Math.PI * 6) * 0.12;
       ctx.scale(s, s);
     }
 
-    ctx.fillStyle = vacuum.hitHighlight ? 'rgba(239, 68, 68, 0.55)' : 'rgba(0, 0, 0, 0.22)';
-    ctx.beginPath();
-    ctx.arc(0, 4.5, vacuum.radius + (vacuum.hitHighlight ? 6 : 2.5), 0, Math.PI * 2);
-    ctx.fill();
+    if (isRhythm) {
+      // 1. Gaming Chassis RGB Neon Underglow (Pumping with Rhythm Beat!)
+      const underglowR = vacuum.radius * 1.55 + (rhythmBeatPulse * 12);
+      const underglowGrad = ctx.createRadialGradient(0, 0, vacuum.radius * 0.45, 0, 0, underglowR);
+      const pulseAlpha = 0.5 + rhythmBeatPulse * 0.4;
+      underglowGrad.addColorStop(0, `hsla(${rgbHue}, 100%, 65%, ${pulseAlpha})`);
+      underglowGrad.addColorStop(0.5, `hsla(${(rgbHue + 60) % 360}, 100%, 60%, ${pulseAlpha * 0.5})`);
+      underglowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = underglowGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, underglowR, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = vacuum.hitHighlight ? 'rgba(239, 68, 68, 0.55)' : 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.arc(0, 4.5, vacuum.radius + (vacuum.hitHighlight ? 6 : 2.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const moveAngle = Math.atan2(vacuum.vy, vacuum.vx);
     ctx.rotate(moveAngle);
@@ -3960,7 +3990,14 @@
       ctx.save();
       ctx.translate(bp.bx, bp.by);
       ctx.rotate(vacuum.rotation * 2.5 * bp.dir);
-      ctx.strokeStyle = '#64748b';
+      if (isRhythm) {
+        ctx.strokeStyle = bp.dir > 0 ? '#38bdf8' : '#ec4899';
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 6;
+      } else {
+        ctx.strokeStyle = '#64748b';
+        ctx.shadowBlur = 0;
+      }
       ctx.lineWidth = 2.4;
       for (let i = 0; i < 3; i++) {
         const a = (i * Math.PI * 2) / 3;
@@ -3972,37 +4009,118 @@
       ctx.restore();
     }
 
-    ctx.fillStyle = '#1e293b';
-    ctx.strokeStyle = vacuum.hitHighlight ? '#ef4444' : worldSlowTimer > 0 ? '#a855f7' : '#334155';
-    ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, vacuum.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (isRhythm) {
+      // --- GAMING RGB ROBOT VACUUM (CHROMA SPECTRUM LIGHTING) ---
+      // Stealth Cyber Matte Black Chassis
+      ctx.fillStyle = '#0a0814';
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius, 0, Math.PI * 2);
+      ctx.fill();
 
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 4.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, vacuum.radius - 1.8, -Math.PI * 0.42, Math.PI * 0.42);
-    ctx.stroke();
+      // Rotating RGB Rainbow Perimeter Ring (Chroma Wave)
+      const segments = 24;
+      const rotSpeed = now * 0.0028;
+      ctx.shadowColor = `hsl(${rgbHue}, 100%, 65%)`;
+      ctx.shadowBlur = 10;
+      for (let i = 0; i < segments; i++) {
+        const a1 = (i / segments) * Math.PI * 2 + rotSpeed;
+        const a2 = ((i + 1.06) / segments) * Math.PI * 2 + rotSpeed;
+        const segHue = Math.round((rgbHue + (i / segments) * 360) % 360);
+        ctx.strokeStyle = `hsl(${segHue}, 100%, 65%)`;
+        ctx.lineWidth = 4.6;
+        ctx.beginPath();
+        ctx.arc(0, 0, vacuum.radius - 1, a1, a2);
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#334155';
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(-2.5, 0, vacuum.radius * 0.64, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      // Front Laser Visor / LED Lightbar
+      const visorHue = (rgbHue + 160) % 360;
+      ctx.strokeStyle = `hsl(${visorHue}, 100%, 70%)`;
+      ctx.shadowColor = `hsl(${visorHue}, 100%, 65%)`;
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 5.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius - 3.2, -Math.PI * 0.44, Math.PI * 0.44);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
-    ctx.fill();
+      // Inner Cyber Plate with Concentric Accent Ring
+      ctx.fillStyle = '#140f26';
+      ctx.strokeStyle = `hsl(${(rgbHue + 80) % 360}, 90%, 65%)`;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-2.5, 0, vacuum.radius * 0.64, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-    ctx.fillStyle = vacuum.suckAnimTimer > 0 ? '#38bdf8' : '#ef4444';
-    ctx.beginPath();
-    ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
-    ctx.fill();
+      // Futuristic Geometric Accent Lines on Plate
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-16, -10);
+      ctx.lineTo(8, -10);
+      ctx.moveTo(-16, 10);
+      ctx.lineTo(8, 10);
+      ctx.stroke();
+
+      // Center Dome Socket
+      ctx.fillStyle = '#06040a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bass-Reactive RGB Central Gaming Core LED
+      const coreHue = (rgbHue + 240) % 360;
+      const coreR = (vacuum.suckAnimTimer > 0 ? 8 : 6.5) + rhythmBeatPulse * 3;
+      ctx.fillStyle = `hsl(${coreHue}, 100%, ${vacuum.suckAnimTimer > 0 ? 80 : 68}%)`;
+      ctx.shadowColor = `hsl(${coreHue}, 100%, 65%)`;
+      ctx.shadowBlur = 14 + rhythmBeatPulse * 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, coreR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Concentric glowing ring around center core
+      ctx.strokeStyle = `hsla(${(coreHue + 60) % 360}, 100%, 75%, ${0.6 + rhythmBeatPulse * 0.4})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, coreR + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // Standard Living Room Vacuum
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = vacuum.hitHighlight ? '#ef4444' : worldSlowTimer > 0 ? '#a855f7' : '#334155';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 4.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, vacuum.radius - 1.8, -Math.PI * 0.42, Math.PI * 0.42);
+      ctx.stroke();
+
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(-2.5, 0, vacuum.radius * 0.64, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = vacuum.suckAnimTimer > 0 ? '#38bdf8' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
@@ -4371,14 +4489,14 @@
     // Custom hub standing hamster image override for LIVING ROOM
     if (roomType === 'living' && assets.hasImage('hub_hamster')) {
       const img = assets.getImage('hub_hamster');
-      let dw = 108;
-      let dh = 100;
+      let dw = 146;
+      let dh = 134;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dw = 108;
+        dw = 146;
         dh = dw / aspect;
-        if (dh > 112) {
-          dh = 112;
+        if (dh > 154) {
+          dh = 154;
           dw = dh * aspect;
         }
       }
@@ -4386,7 +4504,7 @@
       // Soft ground shadow under martial-arts kung-fu stance
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 48 - bounce * 0.35, 34, 7.5, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 62 - bounce * 0.35, 46, 10, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
@@ -4397,14 +4515,14 @@
     // Custom hub standing hamster image override for RHYTHM ROOM
     if (roomType === 'rhythm' && assets.hasImage('hub_hamster_rhythm')) {
       const img = assets.getImage('hub_hamster_rhythm');
-      let dw = 104;
-      let dh = 108;
+      let dw = 140;
+      let dh = 148;
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 110;
+        dh = 150;
         dw = dh * aspect;
-        if (dw > 108) {
-          dw = 108;
+        if (dw > 146) {
+          dw = 146;
           dh = dw / aspect;
         }
       }
@@ -4412,17 +4530,17 @@
       // Soft ground shadow under disco stance
       hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
       hCtx.beginPath();
-      hCtx.ellipse(0, 48 - bounce * 0.35, 34, 7.5, 0, 0, Math.PI * 2);
+      hCtx.ellipse(0, 62 - bounce * 0.35, 46, 10, 0, 0, Math.PI * 2);
       hCtx.fill();
 
       // Floating musical notes around the disco hamster
       const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
       hCtx.fillStyle = track ? track.accentColor : '#d946ef';
-      hCtx.font = '900 14px sans-serif';
+      hCtx.font = '900 16px sans-serif';
       hCtx.textAlign = 'center';
       const noteY = Math.sin(now * 0.009) * 4;
-      hCtx.fillText('♪', 40, -34 + noteY);
-      hCtx.fillText('♫', -40, -32 - noteY);
+      hCtx.fillText('♪', 52, -46 + noteY);
+      hCtx.fillText('♫', -52, -44 - noteY);
 
       assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, dw, dh);
       hCtx.restore();
