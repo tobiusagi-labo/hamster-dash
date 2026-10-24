@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -85,7 +85,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.2.0</div>
+          <div class="title-version-badge">ver 1.3.0</div>
         </div>
       </div>
 
@@ -110,8 +110,15 @@
             <div class="hub-center-hamster" id="hub-center-hamster" title="タップで設定変更">
               <canvas id="hub-hamster-canvas" width="160" height="180"></canvas>
               <div class="rhythm-track-badge hidden" id="rhythm-track-badge">
-                <span class="rhythm-track-name" id="rhythm-track-name">🎵1: ELECTRO</span>
-                <span class="rhythm-track-bpm" id="rhythm-track-bpm">BPM160 👆曲変更</span>
+                <div class="rhythm-track-nav-row">
+                  <button class="track-nav-btn" id="btn-prev-track" type="button" aria-label="前の曲へ">◀</button>
+                  <div class="rhythm-track-info">
+                    <span class="rhythm-track-name" id="rhythm-track-name">🍬 1: KAWAII EDM</span>
+                    <span class="rhythm-track-bpm" id="rhythm-track-bpm">BPM160</span>
+                  </div>
+                  <button class="track-nav-btn" id="btn-next-track" type="button" aria-label="次の曲へ">▶</button>
+                </div>
+                <div class="rhythm-track-hint">👆 タップで曲・衣装チェンジ (全6曲)</div>
               </div>
               <div class="living-option-badge hidden" id="living-option-badge">
                 <span class="living-option-text" id="living-option-text">🐾 Cat+</span>
@@ -327,6 +334,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=12"></script>
+  <script src="game.js?v=13"></script>
 </body>
 </html>
