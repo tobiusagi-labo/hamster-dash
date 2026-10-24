@@ -117,13 +117,16 @@
     }
 
     initImageLoaders() {
-      const v = '24';
+      const v = '25';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
         seed: `assets/images/seed.png?v=${v}`,
         cheese: `assets/images/cheese.png?v=${v}`,
         gold: `assets/images/gold.png?v=${v}`,
+        timer: `assets/images/timer.png?v=${v}`,
+        poison: `assets/images/poison.png?v=${v}`,
+        helmet: `assets/images/helmet.png?v=${v}`,
         vacuum: `assets/images/vacuum.png?v=${v}`,
         yarn: `assets/images/yarn.png?v=${v}`,
         cat_paw: `assets/images/cat_paw.png?v=${v}`,
@@ -156,7 +159,7 @@
     }
 
     initSoundLoaders() {
-      const v = '24';
+      const v = '25';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -245,7 +248,7 @@
   const RHYTHM_TRACKS = [
     {
       id: 'kawaii',
-      shortLabel: '🍬 1: KAWAII EDM',
+      shortLabel: '1: KAWAII EDM',
       fullName: 'KAWAII EDM',
       genre: 'KAWAII EDM',
       bpm: 160,
@@ -270,7 +273,7 @@
     },
     {
       id: 'eurobeat',
-      shortLabel: '🏎️ 2: EUROBEAT RACER',
+      shortLabel: '2: EUROBEAT RACER',
       fullName: 'EUROBEAT RACER',
       genre: 'EUROBEAT',
       bpm: 165,
@@ -294,7 +297,7 @@
     },
     {
       id: 'techno',
-      shortLabel: '⚡ 3: CYBER TECHNO',
+      shortLabel: '3: CYBER TECHNO',
       fullName: 'CYBER TECHNO',
       genre: 'CYBER TECHNO',
       bpm: 170,
@@ -318,7 +321,7 @@
     },
     {
       id: 'chiptune',
-      shortLabel: '🕹️ 4: 8BIT CHIPTUNE',
+      shortLabel: '4: 8BIT CHIPTUNE',
       fullName: '8BIT CHIPTUNE',
       genre: '8BIT CHIPTUNE',
       bpm: 175,
@@ -342,7 +345,7 @@
     },
     {
       id: 'dnb',
-      shortLabel: '🎧 5: DRUM & BASS',
+      shortLabel: '5: DRUM & BASS',
       fullName: 'LIQUID DRUM & BASS',
       genre: 'DRUM & BASS',
       bpm: 180,
@@ -366,7 +369,7 @@
     },
     {
       id: 'hardcore',
-      shortLabel: '🔥 6: HAPPY HARDCORE',
+      shortLabel: '6: HAPPY HARDCORE',
       fullName: 'HAPPY HARDCORE (J-CORE)',
       genre: 'HAPPY HARDCORE',
       bpm: 185,
@@ -4645,6 +4648,11 @@
       ctx.arc(0, 0, ti.radius + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lifeRatio);
       ctx.stroke();
 
+      if (assets.drawImage(ctx, 'timer', 0, 0, ti.radius * 2.4, ti.radius * 2.4)) {
+        ctx.restore();
+        continue;
+      }
+
       ctx.fillStyle = '#eab308';
       ctx.strokeStyle = '#713f12';
       ctx.lineWidth = 1.6;
@@ -4700,6 +4708,11 @@
     ctx.stroke();
     ctx.setLineDash([]);
 
+    if (assets.drawImage(ctx, 'poison', 0, 0, p.radius * 2.5, p.radius * 2.5)) {
+      ctx.restore();
+      return;
+    }
+
     ctx.fillStyle = '#e9d5ff';
     ctx.strokeStyle = '#581c87';
     ctx.lineWidth = 1.8;
@@ -4750,6 +4763,11 @@
     ctx.beginPath();
     ctx.arc(0, 0, h.radius + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lifeRatio);
     ctx.stroke();
+
+    if (assets.drawImage(ctx, 'helmet', 0, 0, h.radius * 2.5, h.radius * 2.5)) {
+      ctx.restore();
+      return;
+    }
 
     // Helmet brim (bottom visor edge)
     ctx.fillStyle = '#f59e0b';
@@ -5160,7 +5178,7 @@
 
       targetCtx.filter = 'none';
 
-      // Equipped helmet protective shield aura
+      // Equipped helmet protective shield aura & cute helmet icon on head
       if (hasHelmet && alpha >= 0.9) {
         const shieldPulse = 1 + Math.sin(performance.now() * 0.01) * 0.06;
         targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.78)';
@@ -5170,6 +5188,13 @@
         targetCtx.arc(0, 0, 24 * shieldPulse, 0, Math.PI * 2);
         targetCtx.fill();
         targetCtx.stroke();
+
+        if (assets.hasImage('helmet')) {
+          targetCtx.save();
+          targetCtx.translate(0, -9);
+          assets.drawImage(targetCtx, 'helmet', 0, 0, 28, 28);
+          targetCtx.restore();
+        }
       } else if (targetCtx === ctx && player.helmetInvulnTimer > 0 && alpha >= 0.9) {
         targetCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
         targetCtx.lineWidth = 2.4;
