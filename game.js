@@ -139,6 +139,7 @@
         const aud = new Audio();
         aud.preload = 'auto';
         aud.src = src;
+        this.sounds[key] = aud;
         aud.addEventListener('loadedmetadata', () => {
           this.sounds[key] = aud;
         });
@@ -428,13 +429,13 @@
       return Math.max(0, Math.min(1, this.muted ? 0 : this.volume * 0.82));
     }
 
-    playBgmFile(key, loop = true, startOffset = 0) {
+    playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
       const primary = assets.getSound(key);
       if (!primary) {
         this.stopBgmFile();
         return false;
       }
-      if (this.currentBgmKey === key && this.currentBgmAudio && !this.currentBgmAudio.paused) {
+      if (!forceRestart && this.currentBgmKey === key && this.currentBgmAudio && !this.currentBgmAudio.paused) {
         this.syncBgmVolume();
         return true;
       }
@@ -624,19 +625,27 @@
       osc.stop(now + 0.09);
     }
 
-    playCountdown(isGo = false) {
+    playCountdown(step = 1) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
+      const isGo = (step === 0 || step === true);
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      const freq = isGo ? 880 : 440;
-      const dur = isGo ? 0.24 : 0.11;
+      osc.type = isGo ? 'sawtooth' : 'triangle';
+
+      let freq = 440; // 3: A4
+      if (step === 2) freq = 554.37; // 2: C#5
+      else if (step === 1) freq = 659.25; // 1: E5
+      else if (isGo) freq = 880; // GO: A5 -> D6
+
+      const dur = isGo ? 0.32 : 0.12;
       osc.frequency.setValueAtTime(freq, now);
       if (isGo) {
-        osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.12);
+        gain.gain.setValueAtTime(0.35, now);
+      } else {
+        gain.gain.setValueAtTime(0.28, now);
       }
-      gain.gain.setValueAtTime(0.22, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
       osc.connect(gain);
       gain.connect(this.dest);
@@ -2017,7 +2026,16 @@
     countdownTimer = 3.0;
     lastCountdownBeep = 4;
     startBannerTimer = 0;
-    syncRoomBgm();
+
+    rhythmTimer = 0;
+    currentBeatIndex = 0;
+    rhythmBeatPulse = 1.0;
+    rhythmTapQueue = [];
+
+    livingBgmTimer = 0;
+    livingBgmStep = 0;
+
+    syncRoomBgm(true);
 
     score = 0;
     combo = 0;
@@ -2495,7 +2513,7 @@
   btnTimeattack.addEventListener('click', () => startGame('timeattack'));
 
   // Central BGM Sync Controller for Audio Files & Procedural Fallbacks
-  function syncRoomBgm() {
+  function syncRoomBgm(forceRestart = false) {
     sound.init();
     if (state !== 'MODESELECT' && state !== 'COUNTDOWN' && state !== 'PLAYING') {
       sound.stopBgmFile();
@@ -2505,13 +2523,13 @@
       const track = RHYTHM_TRACKS[rhythmTrackIndex % RHYTHM_TRACKS.length] || RHYTHM_TRACKS[0];
       const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
       if (assets.hasSound(trackKey)) {
-        sound.playBgmFile(trackKey, true, track.audioOffset || 0);
+        sound.playBgmFile(trackKey, true, track.audioOffset || 0, forceRestart);
       } else {
         sound.stopBgmFile();
       }
     } else {
       if (assets.hasSound('living_bgm')) {
-        sound.playBgmFile('living_bgm', true);
+        sound.playBgmFile('living_bgm', true, 0, forceRestart);
       } else {
         sound.stopBgmFile();
       }
@@ -2826,28 +2844,41 @@
       startBannerTimer = Math.max(0, startBannerTimer - rawDt);
     }
 
-    // --- Shorter, Brisker 3-2-1 Countdown State (1.85x speed = ~1.6s total) ---
+    // --- Tempo-Synchronized 3-2-1 Countdown State (Synchronized to Room BPM!) ---
     if (state === 'COUNTDOWN') {
       for (const f of foods) {
         f.scale = Math.min(1, f.scale + rawDt * 8);
         f.bobPhase += rawDt * 3;
       }
+
+      const beatInterval = roomType === 'rhythm' ? getRhythmBeatInterval() : 0.45;
+
+      // Tick rhythm timer and beat animations during countdown!
+      if (roomType === 'rhythm') {
+        rhythmTimer += rawDt;
+        while (rhythmTimer >= beatInterval) {
+          rhythmTimer -= beatInterval;
+          currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+          rhythmBeatPulse = 1.0;
+        }
+      }
+
+      countdownTimer -= rawDt / beatInterval;
       const currentSec = Math.ceil(countdownTimer);
       if (currentSec < lastCountdownBeep && currentSec >= 1) {
         lastCountdownBeep = currentSec;
-        sound.playCountdown(false);
+        sound.playCountdown(currentSec);
+        if (roomType === 'rhythm') {
+          rhythmBeatPulse = 1.0;
+        }
       }
 
-      countdownTimer -= rawDt * 1.85;
       if (countdownTimer <= 0) {
         state = 'PLAYING';
         startBannerTimer = 0.42;
-        sound.playCountdown(true);
+        sound.playCountdown(0);
         if (roomType === 'rhythm') {
-          rhythmTimer = 0;
-          currentBeatIndex = 0;
           rhythmBeatPulse = 1.0;
-          sound.playRhythmBeat(0, rhythmTrackIndex);
         } else {
           livingBgmTimer = 0;
           livingBgmStep = 0;
