@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '47';
+  const ASSET_VERSION = '48';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -511,10 +511,10 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      if (isRhythm && this.rhythmBufferSource) {
+      if (isRhythm) {
         // Web Audio経由（dest -> limiter -> masterGain: volume適用）
-        // SEとの合成時に0dBFSを超えないようヘッドルームを確保し、一定の音量を安定維持
-        return 0.45;
+        // リズムゲームとしてノリ良くしっかり聴こえる明瞭な音量（0.65）
+        return 0.65;
       }
       // リビングのHTML5 Audio経由（直接ハードウェア出力）
       // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.038）
@@ -536,7 +536,7 @@
       if (this.loadingBuffers && this.loadingBuffers[trackKey]) return;
       if (!this.loadingBuffers) this.loadingBuffers = {};
       this.loadingBuffers[trackKey] = true;
-      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '47';
+      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '48';
       const src = `assets/sounds/${trackKey}.mp3?v=${v}`;
       fetch(src)
         .then(res => {
@@ -778,7 +778,9 @@
         const offset = this.rhythmPauseOffset;
         const targetVol = this.getTargetBgmVolume();
         const gainNode = this.ctx.createGain();
-        gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+        gainNode.gain.value = 0;
+        gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(targetVol, this.ctx.currentTime + 0.03);
         gainNode.connect(this.dest);
 
         const source = this.ctx.createBufferSource();
