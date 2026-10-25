@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '41';
+  const ASSET_VERSION = '42';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -1674,6 +1674,7 @@
   let rhythmBeatPulse = 0;
   let rhythmTapQueue = [];
   let beatDashedBeatIndex = -1;
+  let lastQueuedStepIndex = -1;
 
   function getRhythmBeatInterval() {
     const track = RHYTHM_TRACKS[rhythmTrackIndex] || RHYTHM_TRACKS[0];
@@ -2102,6 +2103,7 @@
     player.isDashing = false;
     rhythmTapQueue = [];
     beatDashedBeatIndex = -1;
+    lastQueuedStepIndex = -1;
     screenShake = 13;
     sound.playHelmetBounce();
 
@@ -2345,6 +2347,7 @@
     rhythmBeatPulse = 1.0;
     rhythmTapQueue = [];
     beatDashedBeatIndex = -1;
+    lastQueuedStepIndex = -1;
 
     livingBgmTimer = 0;
     livingBgmStep = 0;
@@ -3545,6 +3548,7 @@
           rhythmTimer = 0;
           rhythmBeatPulse = 1.0;
           beatDashedBeatIndex = -1;
+          lastQueuedStepIndex = -1;
           syncRoomBgm(true);
         } else {
           livingBgmTimer = 0;
@@ -3646,37 +3650,46 @@
         const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
         const targetFrac = totalSteps % 1.0;
 
+        // 1. Visual perimeter pulse & beat tracking
         if (targetStep !== currentBeatIndex) {
-          // Robust corner crossing check: ensures frame drops don't skip corner triggers
+          currentBeatIndex = targetStep;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+          if (!isCorner && rhythmTapQueue.length === 0) {
+            beatDashedBeatIndex = -1;
+          }
+        }
+        rhythmTimer = targetFrac * subBeatInterval;
+
+        // 2. Queued dash trigger: evaluated with 36ms audio lead so physical sound matches the beat exactly
+        const QUEUED_DASH_LEAD_SEC = 0.036;
+        const queuedAudTime = curAudTime + QUEUED_DASH_LEAD_SEC;
+        const queuedTotalSteps = (queuedAudTime / quarterBeatInterval) * 2;
+        const queuedStep = Math.floor(queuedTotalSteps) % RHYTHM_BEATS;
+
+        if (queuedStep !== lastQueuedStepIndex) {
           let crossedCorner = false;
-          let checkStep = (currentBeatIndex + 1) % RHYTHM_BEATS;
+          let checkStep = (lastQueuedStepIndex + 1) % RHYTHM_BEATS;
           while (true) {
             if (checkStep % 2 === 0) {
               crossedCorner = true;
               break;
             }
-            if (checkStep === targetStep) break;
+            if (checkStep === queuedStep) break;
             checkStep = (checkStep + 1) % RHYTHM_BEATS;
           }
 
-          currentBeatIndex = targetStep;
-          const isCorner = currentBeatIndex % 2 === 0;
+          lastQueuedStepIndex = queuedStep;
+          const isCorner = queuedStep % 2 === 0;
           if (isCorner || crossedCorner) {
-            rhythmBeatPulse = 1.0;
-
-            // 四隅の表拍（1, 2, 3, 4拍目）でのみ予約ダッシュ発動！
-            if (rhythmTapQueue.length > 0) {
+            const cornerStep = isCorner ? queuedStep : checkStep;
+            if (rhythmTapQueue.length > 0 && beatDashedBeatIndex !== cornerStep) {
               const nextTap = rhythmTapQueue.shift();
               executeDashTo(nextTap.x, nextTap.y);
-              beatDashedBeatIndex = currentBeatIndex;
-            } else {
-              beatDashedBeatIndex = -1;
+              beatDashedBeatIndex = cornerStep;
             }
-          } else {
-            rhythmBeatPulse = 0.55;
           }
         }
-        rhythmTimer = targetFrac * subBeatInterval;
       } else {
         rhythmTimer += rawDt;
         while (rhythmTimer >= subBeatInterval) {
