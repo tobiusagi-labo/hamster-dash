@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '38';
+  const ASSET_VERSION = '39';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -286,7 +286,7 @@
       shortLabel: '2: EUROBEAT RACER',
       fullName: 'EUROBEAT RACER',
       genre: 'EUROBEAT',
-      bpm: 165,
+      bpm: 160,
       accentColor: '#f97316',
       leadWave: 'sawtooth',
       bassWave: 'sawtooth',
@@ -310,7 +310,7 @@
       shortLabel: '3: CYBER TECHNO',
       fullName: 'CYBER TECHNO',
       genre: 'CYBER TECHNO',
-      bpm: 170,
+      bpm: 174,
       accentColor: '#06b6d4',
       leadWave: 'square',
       bassWave: 'sawtooth',
@@ -334,7 +334,7 @@
       shortLabel: '4: 8BIT CHIPTUNE',
       fullName: '8BIT CHIPTUNE',
       genre: '8BIT CHIPTUNE',
-      bpm: 175,
+      bpm: 174,
       accentColor: '#38bdf8',
       leadWave: 'square',
       bassWave: 'triangle',
@@ -358,7 +358,7 @@
       shortLabel: '5: DRUM & BASS',
       fullName: 'LIQUID DRUM & BASS',
       genre: 'DRUM & BASS',
-      bpm: 180,
+      bpm: 184,
       accentColor: '#f59e0b',
       leadWave: 'sine',
       bassWave: 'sawtooth',
@@ -382,7 +382,7 @@
       shortLabel: '6: HAPPY HARDCORE',
       fullName: 'HAPPY HARDCORE (J-CORE)',
       genre: 'HAPPY HARDCORE',
-      bpm: 185,
+      bpm: 184,
       accentColor: '#a855f7',
       leadWave: 'sawtooth',
       bassWave: 'square',
@@ -2618,7 +2618,9 @@
     if (roomType === 'rhythm') {
       const quarterBeatInterval = getRhythmBeatInterval();
       const subBeatInterval = quarterBeatInterval * 0.5;
-      const msSinceStep = Math.round(rhythmTimer * 1000);
+      const isCorner = currentBeatIndex % 2 === 0;
+      const timeSinceDownbeat = (isCorner ? 0 : subBeatInterval) + rhythmTimer;
+      const msSinceBeat = Math.round(timeSinceDownbeat * 1000);
 
       const lastRef =
         rhythmTapQueue.length > 0
@@ -2629,10 +2631,10 @@
 
       if (dist(lastRef.x, lastRef.y, tx, ty) < 5) return;
 
-      // 予約キュー方式（表拍・裏拍どちらでもダッシュ可能）:
-      // ・ステップ（表拍または裏拍）直後85ms以内かつこの拍で未ダッシュ・キュー空なら即座にダッシュ発動
-      // ・それ以外は次の拍（表拍または裏拍）で発動するよう予約キューへ格納
-      if (msSinceStep <= 85 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
+      // 予約キュー方式（4拍移動: 四隅の表拍のみでダッシュ発動）:
+      // ・表拍直後100ms以内(msSinceBeat <= 100)かつこの拍で未ダッシュ・キュー空なら、その拍のダッシュとして発動
+      // ・表拍直後101ms以降(msSinceBeat >= 101)は、次の表拍まで待ってからダッシュする予約キューへ格納
+      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
         executeDashTo(tx, ty);
         beatDashedBeatIndex = currentBeatIndex;
         sound.playQueueTap(1);
@@ -3634,13 +3636,15 @@
           const isCorner = currentBeatIndex % 2 === 0;
           rhythmBeatPulse = isCorner ? 1.0 : 0.55;
 
-          // 表拍(角)・裏拍(辺)のどちらでもダッシュ可能！
-          if (rhythmTapQueue.length > 0) {
-            const nextTap = rhythmTapQueue.shift();
-            executeDashTo(nextTap.x, nextTap.y);
-            beatDashedBeatIndex = currentBeatIndex;
-          } else {
-            beatDashedBeatIndex = -1;
+          // 四隅の表拍（1, 2, 3, 4拍目）でのみダッシュ発動！
+          if (isCorner) {
+            if (rhythmTapQueue.length > 0) {
+              const nextTap = rhythmTapQueue.shift();
+              executeDashTo(nextTap.x, nextTap.y);
+              beatDashedBeatIndex = currentBeatIndex;
+            } else {
+              beatDashedBeatIndex = -1;
+            }
           }
         }
         rhythmTimer = targetFrac * subBeatInterval;
@@ -3650,16 +3654,18 @@
           rhythmTimer -= subBeatInterval;
           currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
           const isCorner = currentBeatIndex % 2 === 0;
-          rhythmBeatPulse = isCorner ? 1.0 : 0.65;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
           sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
-          // 表拍(角)・裏拍(辺)のどちらでもダッシュ可能！
-          if (rhythmTapQueue.length > 0) {
-            const nextTap = rhythmTapQueue.shift();
-            executeDashTo(nextTap.x, nextTap.y);
-            beatDashedBeatIndex = currentBeatIndex;
-          } else {
-            beatDashedBeatIndex = -1;
+          // 四隅の表拍（1, 2, 3, 4拍目）でのみダッシュ発動！
+          if (isCorner) {
+            if (rhythmTapQueue.length > 0) {
+              const nextTap = rhythmTapQueue.shift();
+              executeDashTo(nextTap.x, nextTap.y);
+              beatDashedBeatIndex = currentBeatIndex;
+            } else {
+              beatDashedBeatIndex = -1;
+            }
           }
         }
       }
@@ -4373,7 +4379,7 @@
     ctx.font = `800 12px ${POP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const badgeText = '🛠️ リズム検証モード (表・裏拍ダッシュ可・敵なし)';
+    const badgeText = '🛠️ リズム検証モード (4拍移動・敵なし)';
     const textWidth = ctx.measureText(badgeText).width;
     const badgeW = textWidth + 18;
     const badgeH = 22;

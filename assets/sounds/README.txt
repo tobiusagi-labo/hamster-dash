@@ -8,10 +8,11 @@
 【BGMファイル名一覧】
 1. living_bgm.mp3    : LIVING ROOMのBGM（スイカゲーム風など）
 2. rhythm_1.mp3      : RHYTHM ROOM 1曲目（BPM 160）
-3. rhythm_2.mp3      : RHYTHM ROOM 2曲目（BPM 165）
-4. rhythm_3.mp3      : RHYTHM ROOM 3曲目（BPM 170）
-5. rhythm_4.mp3      : RHYTHM ROOM 4曲目（BPM 175）
-6. rhythm_5.mp3      : RHYTHM ROOM 5曲目（BPM 180）
+3. rhythm_2.mp3      : RHYTHM ROOM 2曲目（BPM 160）
+4. rhythm_3.mp3      : RHYTHM ROOM 3曲目（BPM 174）
+5. rhythm_4.mp3      : RHYTHM ROOM 4曲目（BPM 174）
+6. rhythm_5.mp3      : RHYTHM ROOM 5曲目（BPM 184）
+7. rhythm_6.mp3      : RHYTHM ROOM 6曲目（BPM 184）
 
 ※RHYTHM ROOMの曲は、記載のBPMに合わせたテンポの曲を使用すると、
   外周の光のリズムやダッシュのタイミングと完璧にシンクロして遊べます！
