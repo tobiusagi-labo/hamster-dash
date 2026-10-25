@@ -121,7 +121,7 @@
     }
 
     initImageLoaders() {
-      const v = '32';
+      const v = '33';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -131,7 +131,6 @@
         timer: `assets/images/timer.png?v=${v}`,
         poison: `assets/images/poison.png?v=${v}`,
         helmet: `assets/images/helmet.png?v=${v}`,
-        vacuum: `assets/images/vacuum.png?v=${v}`,
         yarn: `assets/images/yarn.png?v=${v}`,
         toy: `assets/images/toy.png?v=${v}`,
         cat_paw: `assets/images/cat_paw.png?v=${v}`,
@@ -164,7 +163,7 @@
     }
 
     initSoundLoaders() {
-      const v = '32';
+      const v = '33';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
