@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '50';
+  const ASSET_VERSION = '51';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -6052,49 +6052,17 @@
           dh = dw / aspect;
         }
 
-        // Swoop in dramatically from right screen edge with jump arc & cute bounce
+        // Slide in smoothly from right screen edge in a straight horizontal line (no parabola, no shadow)
         const elapsed = Math.max(0, (now - titleEnterTime) / 1000);
-        const slideDuration = 0.78;
+        const slideDuration = 0.68;
         const startX = cw + dw * 0.65; // completely beyond the right canvas edge
         const progress = Math.min(1, elapsed / slideDuration);
 
-        let currentX;
-        let jumpY = 0;
-        let angle = 0;
+        // Smooth quartic ease-out for clean friction glide into center
+        const ease = 1 - Math.pow(1 - progress, 4);
+        const currentX = startX + (cx - startX) * ease;
 
-        if (progress < 1) {
-          const p = progress;
-          const ease = 1 - Math.pow(1 - p, 3);
-          currentX = startX + (cx - startX) * ease;
-          // Parabolic jump arc while leaping from screen edge
-          jumpY = -Math.sin(p * Math.PI) * 26;
-          // Dynamic tilt during flight
-          angle = -0.06 * (1 - p);
-        } else {
-          currentX = cx;
-          // Gentle landing squash settling within 0.22s
-          const settleTime = elapsed - slideDuration;
-          if (settleTime < 0.22) {
-            const settleProgress = settleTime / 0.22;
-            const squash = Math.sin(settleProgress * Math.PI) * 6;
-            jumpY = squash;
-          } else {
-            jumpY = 0;
-          }
-          angle = 0;
-        }
-
-        // Soft ground shadow under hero hamster
-        const shadowAlpha = progress < 1 ? 0.12 + 0.14 * progress : 0.26;
-        const shadowScale = progress < 1 ? 0.7 + 0.3 * (1 - Math.abs(jumpY) / 26) : 1;
-        tCtx.save();
-        tCtx.fillStyle = `rgba(120, 53, 15, ${shadowAlpha})`;
-        tCtx.beginPath();
-        tCtx.ellipse(currentX, cy + dh * 0.44, (dw * 0.33) * shadowScale, 11 * shadowScale, 0, 0, Math.PI * 2);
-        tCtx.fill();
-        tCtx.restore();
-
-        assets.drawImage(tCtx, 'title_mascot', currentX, cy + jumpY, dw, dh, angle);
+        assets.drawImage(tCtx, 'title_mascot', currentX, cy, dw, dh);
       } else {
         assets.drawImage(tCtx, 'title_mascot', cx, cy, 320, 240);
       }
