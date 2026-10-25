@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '43';
+  const ASSET_VERSION = '44';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -508,8 +508,10 @@
 
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
-      const baseRatio = 0.38; // リズムモードのBGM音量をリビングルームと同等のバランス（0.38）に統一
-      return Math.max(0, Math.min(1, this.volume * baseRatio));
+      const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
+      // リビングのMP3音圧が高くHTML5直接出力のため0.20、リズムはWebAudio経由でmasterGainを通るため0.70で聴感上の音量を完全一致
+      const ratio = isRhythm ? 0.70 : 0.20;
+      return Math.max(0, Math.min(1, this.volume * ratio));
     }
 
     loadRhythmBuffer(trackKey) {
@@ -3660,8 +3662,8 @@
         }
         rhythmTimer = targetFrac * subBeatInterval;
 
-        // 2. Queued dash trigger: 16ms (1フレーム分) の微小先行リードでフレーム遅れを相殺し曲と完全一致
-        const QUEUED_DASH_LEAD_SEC = 0.016;
+        // 2. Queued dash trigger: 6msの極小先行リードで早すぎず遅れのない完璧なジャストタイミングに調整
+        const QUEUED_DASH_LEAD_SEC = 0.006;
         const queuedAudTime = curAudTime + QUEUED_DASH_LEAD_SEC;
         const queuedTotalSteps = (queuedAudTime / quarterBeatInterval) * 2;
         const queuedStep = Math.floor(queuedTotalSteps) % RHYTHM_BEATS;
