@@ -496,34 +496,77 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  font-size: 40px;
-  font-weight: 900;
-  line-height: 1.15;
+  gap: 0;
   margin-bottom: 8px;
+  position: relative;
+  filter: drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 4px #ffffff) drop-shadow(0 4px 10px rgba(120, 53, 15, 0.28));
 }
 
-.char-pop {
+.logo-speed-left,
+.logo-speed-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.logo-speed-left span,
+.logo-speed-right span {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  box-shadow: 0 0 0 1.5px #ffffff, 0 2px 4px rgba(180, 83, 9, 0.25);
+}
+
+.logo-speed-left {
+  margin-right: 3px;
+  transform: rotate(-10deg);
+}
+
+.logo-speed-left span:nth-child(1) { width: 14px; margin-left: 6px; }
+.logo-speed-left span:nth-child(2) { width: 20px; }
+
+.logo-speed-right {
+  margin-left: 3px;
+  transform: rotate(10deg);
+}
+
+.logo-speed-right span:nth-child(1) { width: 20px; }
+.logo-speed-right span:nth-child(2) { width: 14px; margin-left: 6px; }
+
+.logo-char {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  animation: logo-char-bounce 2.4s ease-in-out infinite;
+  transform-origin: center bottom;
   display: inline-block;
-  padding: 0 1px;
-  color: #78350f;
-  -webkit-text-stroke: 6px #ffffff;
-  paint-order: stroke fill;
-  filter: drop-shadow(0 4px 0 #f59e0b) drop-shadow(0 7px 12px rgba(180, 83, 9, 0.25));
-  animation: char-bounce 2.2s ease-in-out infinite;
 }
 
-.char-pop.c1 { color: #ea580c; transform: rotate(-5deg); animation-delay: 0.0s; }
-.char-pop.c2 { color: #d97706; transform: rotate(3deg); animation-delay: 0.1s; }
-.char-pop.c3 { color: #e11d48; transform: rotate(-3deg); animation-delay: 0.2s; }
-.char-pop.c4 { color: #f59e0b; font-size: 32px; transform: translateY(3px) rotate(4deg); animation-delay: 0.3s; }
-.char-pop.c5 { color: #d97706; transform: rotate(-4deg); animation-delay: 0.4s; }
-.char-pop.c6 { color: #ea580c; font-size: 33px; transform: translateY(3px) rotate(3deg); animation-delay: 0.5s; }
-.char-pop.c7 { color: #f43f5e; transform: rotate(7deg); animation-delay: 0.6s; }
+.logo-char.char-1 { transform: rotate(-5deg); animation-delay: 0.0s; z-index: 6; }
+.logo-char.char-2 { transform: rotate(2deg); animation-delay: 0.12s; z-index: 5; margin-left: -7px; }
+.logo-char.char-3 { transform: rotate(-2deg); animation-delay: 0.24s; z-index: 4; margin-left: -5px; }
+.logo-char.char-4 { transform: rotate(3deg) scale(0.92); animation-delay: 0.36s; z-index: 3; margin-left: -5px; }
+.logo-char.char-5 { transform: rotate(-3deg); animation-delay: 0.48s; z-index: 2; margin-left: -6px; }
+.logo-char.char-6 { transform: rotate(4deg); animation-delay: 0.60s; z-index: 1; margin-left: -6px; }
 
-@keyframes char-bounce {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -4px; }
+@keyframes logo-char-bounce {
+  0%, 100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: 0 -8px;
+  }
+  45% {
+    translate: 0 1px;
+  }
+  60% {
+    translate: 0 -2px;
+  }
 }
 
 .splash-subtitle-pill {

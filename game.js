@@ -118,7 +118,7 @@
     }
 
     initImageLoaders() {
-      const v = '28';
+      const v = '29';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -161,7 +161,7 @@
     }
 
     initSoundLoaders() {
-      const v = '28';
+      const v = '29';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
