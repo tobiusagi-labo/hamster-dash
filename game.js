@@ -34,6 +34,7 @@
   const btnPauseMute = document.getElementById('btn-pause-mute');
   const btnPauseResume = document.getElementById('btn-pause-resume');
   const btnPauseRestart = document.getElementById('btn-pause-restart');
+  const btnPauseRoom = document.getElementById('btn-pause-room');
   const btnPauseTitle = document.getElementById('btn-pause-title');
 
   const titleHeroCanvas = document.getElementById('title-hero-canvas');
@@ -118,7 +119,7 @@
     }
 
     initImageLoaders() {
-      const v = '30';
+      const v = '31';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -161,7 +162,7 @@
     }
 
     initSoundLoaders() {
-      const v = '30';
+      const v = '31';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -1539,6 +1540,10 @@
     return 60 / track.bpm;
   }
 
+  function getRhythmSubBeatInterval() {
+    return getRhythmBeatInterval() * 0.5;
+  }
+
   // Living Room Suika-Game-Style BGM Sequencer State
   const LIVING_BGM_STEP_INTERVAL = 0.22;
   let livingBgmTimer = 0;
@@ -2473,7 +2478,7 @@
       }
 
       const totalBeats = curTime / beatInterval;
-      const targetBeat = Math.floor(totalBeats) % RHYTHM_BEATS;
+      const targetBeat = Math.floor(totalBeats) % 4;
       const beatFrac = totalBeats % 1.0;
       const msSinceBeat = Math.round(beatFrac * beatInterval * 1000);
 
@@ -2657,6 +2662,12 @@
       isPaused = false;
       if (pauseModal) pauseModal.classList.add('hidden');
       startGame(gameMode);
+    });
+  }
+
+  if (btnPauseRoom) {
+    btnPauseRoom.addEventListener('click', () => {
+      goToRoomSelect();
     });
   }
 
@@ -3267,12 +3278,13 @@
 
     // Play Rhythm Room groove BGM while in Mode Select (when RHYTHM ROOM is selected)
     if (state === 'MODESELECT' && roomType === 'rhythm') {
-      const beatInterval = getRhythmBeatInterval();
+      const subInterval = getRhythmSubBeatInterval();
       rhythmTimer += rawDt;
-      while (rhythmTimer >= beatInterval) {
-        rhythmTimer -= beatInterval;
+      while (rhythmTimer >= subInterval) {
+        rhythmTimer -= subInterval;
         currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-        rhythmBeatPulse = 1.0;
+        const isCorner = currentBeatIndex % 2 === 0;
+        rhythmBeatPulse = isCorner ? 1.0 : 0.55;
         sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
       }
     }
@@ -3339,24 +3351,31 @@
         f.bobPhase += rawDt * 3;
       }
 
-      const beatInterval = Math.max(0.2, roomType === 'rhythm' ? getRhythmBeatInterval() : 0.45);
+      const quarterBeatInterval = Math.max(0.2, roomType === 'rhythm' ? getRhythmBeatInterval() : 0.45);
+      const subBeatInterval = quarterBeatInterval * 0.5;
 
       // Tick rhythm timer and beat animations during countdown!
       if (roomType === 'rhythm') {
         rhythmTimer += rawDt;
-        while (rhythmTimer >= beatInterval) {
-          rhythmTimer -= beatInterval;
+        while (rhythmTimer >= subBeatInterval) {
+          rhythmTimer -= subBeatInterval;
           currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-          rhythmBeatPulse = 1.0;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
         }
       }
 
-      countdownTimer = Math.max(0, countdownTimer - rawDt / beatInterval);
+      countdownTimer = Math.max(0, countdownTimer - rawDt / quarterBeatInterval);
       const currentSec = Math.ceil(countdownTimer);
       if (currentSec < lastCountdownBeep && currentSec >= 1) {
         lastCountdownBeep = currentSec;
         sound.playCountdown(currentSec);
         if (roomType === 'rhythm') {
+          const cornerMap = { 4: 0, 3: 2, 2: 4, 1: 6 };
+          if (cornerMap[currentSec] !== undefined) {
+            currentBeatIndex = cornerMap[currentSec];
+            rhythmTimer = 0;
+          }
           rhythmBeatPulse = 1.0;
         }
       }
@@ -3366,6 +3385,8 @@
         startBannerTimer = 0.42;
         sound.playCountdown(0);
         if (roomType === 'rhythm') {
+          currentBeatIndex = 0;
+          rhythmTimer = 0;
           rhythmBeatPulse = 1.0;
         } else {
           livingBgmTimer = 0;
@@ -3454,9 +3475,10 @@
 
     if (state !== 'PLAYING') return;
 
-    // --- 8-Beat Rhythm Clock & Queued Dash Trigger (RHYTHM ROOM) or Suika-Style BGM (LIVING ROOM) ---
+    // --- 4-Beat Rhythm Clock & Queued Dash Trigger (RHYTHM ROOM) or Suika-Style BGM (LIVING ROOM) ---
     if (roomType === 'rhythm') {
-      const beatInterval = getRhythmBeatInterval();
+      const quarterBeatInterval = getRhythmBeatInterval();
+      const subBeatInterval = quarterBeatInterval * 0.5;
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
 
       const aud = sound.currentBgmAudio;
@@ -3464,29 +3486,33 @@
         // Hardware audio clock synchronization with user timing offset calibration!
         const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
         const curAudTime = Math.max(0, aud.currentTime - offsetSec);
-        const totalBeats = curAudTime / beatInterval;
-        const targetBeat = Math.floor(totalBeats) % RHYTHM_BEATS;
-        const targetFrac = totalBeats % 1.0;
+        const totalSteps = (curAudTime / quarterBeatInterval) * 2;
+        const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
+        const targetFrac = totalSteps % 1.0;
 
-        if (targetBeat !== currentBeatIndex) {
-          currentBeatIndex = targetBeat;
-          rhythmBeatPulse = 1.0;
-          if (rhythmTapQueue.length > 0) {
+        if (targetStep !== currentBeatIndex) {
+          currentBeatIndex = targetStep;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+
+          // Corner downbeats (表拍: 1, 2, 3, 4拍目) trigger queued dashes!
+          if (isCorner && rhythmTapQueue.length > 0) {
             const nextTap = rhythmTapQueue.shift();
             executeDashTo(nextTap.x, nextTap.y);
             beatDashedBeatIndex = currentBeatIndex;
           }
         }
-        rhythmTimer = targetFrac * beatInterval;
+        rhythmTimer = targetFrac * subBeatInterval;
       } else {
         rhythmTimer += rawDt;
-        while (rhythmTimer >= beatInterval) {
-          rhythmTimer -= beatInterval;
+        while (rhythmTimer >= subBeatInterval) {
+          rhythmTimer -= subBeatInterval;
           currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-          rhythmBeatPulse = 1.0;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
           sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
-          if (rhythmTapQueue.length > 0) {
+          if (isCorner && rhythmTapQueue.length > 0) {
             const nextTap = rhythmTapQueue.shift();
             executeDashTo(nextTap.x, nextTap.y);
             beatDashedBeatIndex = currentBeatIndex;
@@ -4104,22 +4130,22 @@
     const yM = ry + rh * 0.5;
     const yB = ry + rh;
 
-    // 8 Beat Points around the perimeter: 4 Corners (0,2,4,6) & 4 Edge Midpoints (1,3,5,7)
+    // 8 Beat Points around the perimeter: 4 Corners (表拍: 1, 2, 3, 4拍目) & 4 Edge Midpoints (裏拍: &)
     const pts = [
-      { x: xL, y: yT, isCorner: true },  // Beat 1: Top-Left Corner
-      { x: xM, y: yT, isCorner: false }, // Beat 2: Top Edge Center
-      { x: xR, y: yT, isCorner: true },  // Beat 3: Top-Right Corner
-      { x: xR, y: yM, isCorner: false }, // Beat 4: Right Edge Center
-      { x: xR, y: yB, isCorner: true },  // Beat 5: Bottom-Right Corner
-      { x: xM, y: yB, isCorner: false }, // Beat 6: Bottom Edge Center
-      { x: xL, y: yB, isCorner: true },  // Beat 7: Bottom-Left Corner
-      { x: xL, y: yM, isCorner: false }, // Beat 8: Left Edge Center
+      { x: xL, y: yT, isCorner: true, beatNum: 1 },  // Step 0: 1拍目 (表拍) Top-Left Corner
+      { x: xM, y: yT, isCorner: false },             // Step 1: 1拍目裏 (裏拍) Top Edge Center
+      { x: xR, y: yT, isCorner: true, beatNum: 2 },  // Step 2: 2拍目 (表拍) Top-Right Corner
+      { x: xR, y: yM, isCorner: false },             // Step 3: 2拍目裏 (裏拍) Right Edge Center
+      { x: xR, y: yB, isCorner: true, beatNum: 3 },  // Step 4: 3拍目 (表拍) Bottom-Right Corner
+      { x: xM, y: yB, isCorner: false },             // Step 5: 3拍目裏 (裏拍) Bottom Edge Center
+      { x: xL, y: yB, isCorner: true, beatNum: 4 },  // Step 6: 4拍目 (表拍) Bottom-Left Corner
+      { x: xL, y: yM, isCorner: false },             // Step 7: 4拍目裏 (裏拍) Left Edge Center
     ];
 
     function getPointAtBeat(beatVal) {
-      const wrapped = ((beatVal % RHYTHM_BEATS) + RHYTHM_BEATS) % RHYTHM_BEATS;
+      const wrapped = ((beatVal % 8) + 8) % 8;
       const i0 = Math.floor(wrapped);
-      const i1 = (i0 + 1) % RHYTHM_BEATS;
+      const i1 = (i0 + 1) % 8;
       const f = wrapped - i0;
       return {
         x: pts[i0].x + (pts[i1].x - pts[i0].x) * f,
@@ -4177,16 +4203,30 @@
     ctx.stroke();
     ctx.restore();
 
-    const beatInterval = getRhythmBeatInterval();
-    const frac = state === 'PLAYING' ? clamp(rhythmTimer / beatInterval, 0, 1) : 0;
-    const currentContinuousBeat = currentBeatIndex + frac;
+    const quarterBeatInterval = getRhythmBeatInterval();
+    const subBeatInterval = quarterBeatInterval * 0.5;
+    let currentContinuousStep = 0;
+
+    const aud = sound.currentBgmAudio;
+    if (aud && !aud.paused && aud.duration > 0 && state === 'PLAYING') {
+      const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
+      const curAudTime = Math.max(0, aud.currentTime - offsetSec);
+      const totalSteps = (curAudTime / quarterBeatInterval) * 2;
+      currentContinuousStep = ((totalSteps % 8) + 8) % 8;
+    } else if (state === 'COUNTDOWN') {
+      const beatsElapsed = clamp(4.0 - countdownTimer, 0, 4.0);
+      currentContinuousStep = ((beatsElapsed * 2) % 8);
+    } else {
+      const frac = clamp(rhythmTimer / subBeatInterval, 0, 1);
+      currentContinuousStep = ((currentBeatIndex + frac) % 8);
+    }
 
     // 1. Draw glowing comet trail of the orbiting light along the perimeter
     const trailSteps = 18;
-    const trailSpanBeats = 0.85;
+    const trailSpanSteps = 1.6;
     for (let s = 0; s < trailSteps; s++) {
-      const t0 = currentContinuousBeat - ((trailSteps - s) / trailSteps) * trailSpanBeats;
-      const t1 = currentContinuousBeat - ((trailSteps - s - 1) / trailSteps) * trailSpanBeats;
+      const t0 = currentContinuousStep - ((trailSteps - s) / trailSteps) * trailSpanSteps;
+      const t1 = currentContinuousStep - ((trailSteps - s - 1) / trailSteps) * trailSpanSteps;
       const p0 = getPointAtBeat(t0);
       const p1 = getPointAtBeat(t1);
       const ratio = (s + 1) / trailSteps;
@@ -4203,62 +4243,75 @@
       ctx.stroke();
     }
 
-    // 2. Draw the 8 Beat Nodes (4 Corners + 4 Edge Midpoints)
-    const nextBeatIdx = (currentBeatIndex + 1) % RHYTHM_BEATS;
-    for (let i = 0; i < RHYTHM_BEATS; i++) {
-      const pt = pts[i];
-      const isCurrentHit = i === currentBeatIndex;
-      const isNextTarget = i === nextBeatIdx;
-      const baseR = pt.isCorner ? 7.2 : 6.0;
+    // 2. Draw the 8 Beat Nodes: 4 Corners (表拍: large, distinct, numbered) + 4 Edges (裏拍: sleek dots)
+    const activeStepIdx = Math.floor(currentContinuousStep);
+    const nextStepIdx = (activeStepIdx + 1) % 8;
 
-      // Pulse ring on the node that just triggered the beat
+    for (let i = 0; i < 8; i++) {
+      const pt = pts[i];
+      const isCurrentHit = i === activeStepIdx;
+      const isNextTarget = i === nextStepIdx;
+      const isCorner = pt.isCorner;
+      const baseR = isCorner ? 13 : 5.0; // Large 13px spheres for 表拍 corners!
+
+      // Expanding pulse ripple ring on the node
       if (isCurrentHit && rhythmBeatPulse > 0.05) {
-        const ringR = baseR + (1 - rhythmBeatPulse) * 18;
-        ctx.strokeStyle = `rgba(250, 204, 21, ${rhythmBeatPulse * 0.9})`;
-        ctx.lineWidth = 2.5;
+        const ringR = baseR + (1 - rhythmBeatPulse) * (isCorner ? 26 : 12);
+        ctx.strokeStyle = isCorner
+          ? `rgba(250, 204, 21, ${rhythmBeatPulse * 0.95})`
+          : `rgba(244, 114, 182, ${rhythmBeatPulse * 0.75})`;
+        ctx.lineWidth = isCorner ? 3.0 : 1.8;
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, ringR, 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      // Node outer circle
+      // Sphere fill and border
       ctx.fillStyle = isCurrentHit
         ? '#fde047'
         : isNextTarget
         ? '#f472b6'
-        : pt.isCorner
+        : isCorner
         ? '#a855f7'
-        : '#38bdf8';
+        : 'rgba(56, 189, 248, 0.75)';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = isCorner ? 2.5 : 1.5;
       ctx.beginPath();
       ctx.arc(
         pt.x,
         pt.y,
-        baseR + (isCurrentHit ? rhythmBeatPulse * 3.2 : 0),
+        baseR + (isCurrentHit ? rhythmBeatPulse * (isCorner ? 3.5 : 2.0) : 0),
         0,
         Math.PI * 2
       );
       ctx.fill();
       ctx.stroke();
 
-      // Inner bright core
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, pt.isCorner ? 2.6 : 2.0, 0, Math.PI * 2);
-      ctx.fill();
+      if (isCorner) {
+        // Inner Beat Number (1, 2, 3, 4) in bold Mochiy Pop font!
+        ctx.font = `900 11px ${POP_FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = isCurrentHit ? '#78350f' : '#ffffff';
+        ctx.fillText(String(pt.beatNum), pt.x, pt.y + 0.5);
+      } else {
+        // Inner bright core dot for edge upbeat
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // 3. Draw the main Orbiting Light Orb at currentContinuousBeat
-    const headPos = getPointAtBeat(currentContinuousBeat);
-
+    // 3. Main orbiting light head orb
+    const headPos = getPointAtBeat(currentContinuousStep);
     const glowGrad = ctx.createRadialGradient(
       headPos.x,
       headPos.y,
       2,
       headPos.x,
       headPos.y,
-      22
+      24
     );
     glowGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
     glowGrad.addColorStop(0.35, 'rgba(253, 224, 71, 0.95)');
@@ -4266,14 +4319,14 @@
     glowGrad.addColorStop(1, 'rgba(236, 72, 153, 0)');
     ctx.fillStyle = glowGrad;
     ctx.beginPath();
-    ctx.arc(headPos.x, headPos.y, 22, 0, Math.PI * 2);
+    ctx.arc(headPos.x, headPos.y, 24, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(headPos.x, headPos.y, 6.5, 0, Math.PI * 2);
+    ctx.arc(headPos.x, headPos.y, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -7380,13 +7433,22 @@
       ctx.fillStyle = num >= 4 ? '#38bdf8' : '#f59e0b';
       ctx.fillText(label, 0, 0);
 
-      if (num < 4) {
-        ctx.font = `900 16px ${POP_FONT}`;
-        ctx.strokeStyle = '#78350f';
-        ctx.lineWidth = 5;
-        ctx.strokeText('READY...', 0, 62);
-        ctx.fillStyle = '#fffbeb';
-        ctx.fillText('READY...', 0, 62);
+      if (roomType === 'rhythm') {
+        const beatNames = {
+          4: '1拍目 🐾 左上',
+          3: '2拍目 🐾 右上',
+          2: '3拍目 🐾 右下',
+          1: '4拍目 🐾 左下',
+        };
+        const beatTag = beatNames[num];
+        if (beatTag) {
+          ctx.font = `900 16px ${POP_FONT}`;
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 5;
+          ctx.strokeText(beatTag, 0, 58);
+          ctx.fillStyle = '#fde047';
+          ctx.fillText(beatTag, 0, 58);
+        }
       }
     } else if (startBannerTimer > 0) {
       const ratio = clamp(startBannerTimer / 0.42, 0, 1);
