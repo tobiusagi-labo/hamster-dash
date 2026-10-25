@@ -2210,7 +2210,11 @@
     livingBgmTimer = 0;
     livingBgmStep = 0;
 
-    syncRoomBgm(true);
+    if (roomType === 'rhythm') {
+      sound.stopBgmFile();
+    } else {
+      syncRoomBgm(true);
+    }
 
     score = 0;
     combo = 0;
@@ -2468,20 +2472,11 @@
     const ty = clamp(rawY, HUD_TOP_MARGIN + WALL_PADDING, height - WALL_PADDING);
 
     if (roomType === 'rhythm') {
-      const beatInterval = getRhythmBeatInterval();
-      const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
-      let curTime = 0;
-      const aud = sound.currentBgmAudio;
-      if (aud && !aud.paused && aud.duration > 0) {
-        curTime = Math.max(0, aud.currentTime - offsetSec);
-      } else {
-        curTime = Math.max(0, (performance.now() * 0.001) - offsetSec);
-      }
-
-      const totalBeats = curTime / beatInterval;
-      const targetBeat = Math.floor(totalBeats) % 4;
-      const beatFrac = totalBeats % 1.0;
-      const msSinceBeat = Math.round(beatFrac * beatInterval * 1000);
+      const quarterBeatInterval = getRhythmBeatInterval();
+      const subBeatInterval = quarterBeatInterval * 0.5;
+      const isCorner = currentBeatIndex % 2 === 0;
+      const timeSinceDownbeat = (isCorner ? 0 : subBeatInterval) + rhythmTimer;
+      const msSinceBeat = Math.round(timeSinceDownbeat * 1000);
 
       const lastRef =
         rhythmTapQueue.length > 0
@@ -2495,9 +2490,9 @@
       // 予約キュー方式統一（Justbeat廃止）:
       // ・ビート直後100ms以内(msSinceBeat <= 100)かつこの拍で未ダッシュ・キュー空なら、その拍のダッシュとして発動
       // ・ビート直後101ms以降(msSinceBeat >= 101)は、次の拍まで待ってからダッシュする予約キューへ格納
-      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== targetBeat && !player.isDashing) {
+      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
         executeDashTo(tx, ty);
-        beatDashedBeatIndex = targetBeat;
+        beatDashedBeatIndex = currentBeatIndex;
         sound.playQueueTap(1);
       } else {
         rhythmTapQueue.push({ x: tx, y: ty });
@@ -3397,6 +3392,8 @@
           currentBeatIndex = 0;
           rhythmTimer = 0;
           rhythmBeatPulse = 1.0;
+          beatDashedBeatIndex = -1;
+          syncRoomBgm(true);
         } else {
           livingBgmTimer = 0;
           livingBgmStep = 0;
@@ -3490,41 +3487,21 @@
       const subBeatInterval = quarterBeatInterval * 0.5;
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
 
-      const aud = sound.currentBgmAudio;
-      if (aud && !aud.paused && aud.duration > 0 && state === 'PLAYING') {
-        // Hardware audio clock synchronization with user timing offset calibration!
-        const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
-        const curAudTime = Math.max(0, aud.currentTime - offsetSec);
-        const totalSteps = (curAudTime / quarterBeatInterval) * 2;
-        const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
-        const targetFrac = totalSteps % 1.0;
+      rhythmTimer += rawDt;
+      while (rhythmTimer >= subBeatInterval) {
+        rhythmTimer -= subBeatInterval;
+        currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+        const isCorner = currentBeatIndex % 2 === 0;
+        rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
-        if (targetStep !== currentBeatIndex) {
-          currentBeatIndex = targetStep;
-          const isCorner = currentBeatIndex % 2 === 0;
-          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
-
-          // Corner downbeats (表拍: 1, 2, 3, 4拍目) trigger queued dashes!
-          if (isCorner && rhythmTapQueue.length > 0) {
+        if (isCorner) {
+          if (rhythmTapQueue.length > 0) {
             const nextTap = rhythmTapQueue.shift();
             executeDashTo(nextTap.x, nextTap.y);
             beatDashedBeatIndex = currentBeatIndex;
-          }
-        }
-        rhythmTimer = targetFrac * subBeatInterval;
-      } else {
-        rhythmTimer += rawDt;
-        while (rhythmTimer >= subBeatInterval) {
-          rhythmTimer -= subBeatInterval;
-          currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-          const isCorner = currentBeatIndex % 2 === 0;
-          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
-          sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
-
-          if (isCorner && rhythmTapQueue.length > 0) {
-            const nextTap = rhythmTapQueue.shift();
-            executeDashTo(nextTap.x, nextTap.y);
-            beatDashedBeatIndex = currentBeatIndex;
+          } else {
+            beatDashedBeatIndex = -1;
           }
         }
       }
@@ -4216,13 +4193,7 @@
     const subBeatInterval = quarterBeatInterval * 0.5;
     let currentContinuousStep = 0;
 
-    const aud = sound.currentBgmAudio;
-    if (aud && !aud.paused && aud.duration > 0 && state === 'PLAYING') {
-      const offsetSec = (sound.timingOffsetMs || 0) * 0.001;
-      const curAudTime = Math.max(0, aud.currentTime - offsetSec);
-      const totalSteps = (curAudTime / quarterBeatInterval) * 2;
-      currentContinuousStep = ((totalSteps % 8) + 8) % 8;
-    } else if (state === 'COUNTDOWN') {
+    if (state === 'COUNTDOWN') {
       const beatsElapsed = clamp(4.0 - countdownTimer, 0, 4.0);
       currentContinuousStep = ((beatsElapsed * 2) % 8);
     } else {
@@ -7442,23 +7413,6 @@
       ctx.fillStyle = num >= 4 ? '#38bdf8' : '#f59e0b';
       ctx.fillText(label, 0, 0);
 
-      if (roomType === 'rhythm') {
-        const beatNames = {
-          4: '1拍目 🐾 左上',
-          3: '2拍目 🐾 右上',
-          2: '3拍目 🐾 右下',
-          1: '4拍目 🐾 左下',
-        };
-        const beatTag = beatNames[num];
-        if (beatTag) {
-          ctx.font = `900 16px ${POP_FONT}`;
-          ctx.strokeStyle = '#78350f';
-          ctx.lineWidth = 5;
-          ctx.strokeText(beatTag, 0, 58);
-          ctx.fillStyle = '#fde047';
-          ctx.fillText(beatTag, 0, 58);
-        }
-      }
     } else if (startBannerTimer > 0) {
       const ratio = clamp(startBannerTimer / 0.42, 0, 1);
       const scale = 1 + (1 - ratio) * 0.45;
