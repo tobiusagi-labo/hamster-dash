@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '48';
+  const ASSET_VERSION = '49';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -1699,6 +1699,12 @@
 
   // LIVING ROOM Options ('none' | 'cat' | 'ice')
   let livingOption = 'none';
+  try {
+    const savedLivingOpt = localStorage.getItem('hamster_dash_living_option_v1');
+    if (savedLivingOpt === 'cat' || savedLivingOpt === 'ice' || savedLivingOpt === 'none') {
+      livingOption = savedLivingOpt;
+    }
+  } catch (_) {}
   let livingTapCount = 0;
 
   // Cat Paw Hazard State (Cat+)
@@ -2505,9 +2511,16 @@
     spawnObstacle(true);
     nextObstacleTimer = 7.5;
     if (roomType === 'living' && livingOption === 'cat') {
-      nextCatPawTimer = randRange(8, 14);
+      catPaw.active = true;
+      catPaw.state = 'idle';
+      catPaw.reach = 0;
+      catPaw.timer = 0;
+      catPaw.nextSpawnTimer = randRange(2.5, 4.5);
     } else {
       catPaw.active = false;
+      catPaw.state = 'idle';
+      catPaw.reach = 0;
+      catPaw.timer = 0;
     }
 
     spawnFood(FOOD_TYPES[0]);
@@ -3019,19 +3032,22 @@
       if (rhythmTrackBadge) rhythmTrackBadge.classList.add('hidden');
       if (livingTrackBadge) livingTrackBadge.classList.add('hidden');
       if (livingOptionBadge) {
+        livingOptionBadge.classList.remove('hidden');
         if (livingOption === 'cat') {
-          livingOptionBadge.classList.remove('hidden', 'ice-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+';
+          livingOptionBadge.classList.remove('ice-theme', 'normal-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+ (猫の手襲来)';
         } else if (livingOption === 'ice') {
-          livingOptionBadge.classList.remove('hidden');
           livingOptionBadge.classList.add('ice-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+';
+          livingOptionBadge.classList.remove('normal-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+ (つるつる床)';
         } else {
-          livingOptionBadge.classList.add('hidden');
+          livingOptionBadge.classList.add('normal-theme');
+          livingOptionBadge.classList.remove('ice-theme');
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🏠 通常モード (タップで切替)';
         }
       }
       if (hubCenterHamster) {
-        hubCenterHamster.title = livingOption === 'none' ? '5回タップで裏モード切替' : `現在: ${livingOption.toUpperCase()}+ (5回タップで切替)`;
+        hubCenterHamster.title = `現在: ${livingOption.toUpperCase()}+ (タップで切替)`;
       }
     }
 
@@ -3142,28 +3158,31 @@
     });
   }
 
+  function cycleLivingOption() {
+    sound.init();
+    hamsterTapPulseTimer = 0.36;
+    livingTapCount = 0;
+    if (livingOption === 'none') {
+      livingOption = 'cat';
+    } else if (livingOption === 'cat') {
+      livingOption = 'ice';
+    } else {
+      livingOption = 'none';
+    }
+    try {
+      localStorage.setItem('hamster_dash_living_option_v1', livingOption);
+    } catch (_) {}
+    sound.playCountdown(true);
+    updateRoomSwitchUI();
+  }
+
   if (hubCenterHamster) {
     hubCenterHamster.addEventListener('click', (e) => {
       sound.init();
       if (roomType === 'rhythm') {
         changeRhythmTrack(1);
       } else {
-        hamsterTapPulseTimer = 0.36;
-        livingTapCount++;
-        if (livingTapCount >= 5) {
-          livingTapCount = 0;
-          if (livingOption === 'none') {
-            livingOption = 'cat';
-          } else if (livingOption === 'cat') {
-            livingOption = 'ice';
-          } else {
-            livingOption = 'none';
-          }
-          sound.playCountdown(true); // ポップな通知音
-        } else {
-          sound.playUIClick();
-        }
-        updateRoomSwitchUI();
+        cycleLivingOption();
       }
     });
   }
@@ -3171,18 +3190,7 @@
   if (livingOptionBadge) {
     livingOptionBadge.addEventListener('click', (e) => {
       e.stopPropagation();
-      sound.init();
-      hamsterTapPulseTimer = 0.36;
-      livingTapCount = 0;
-      if (livingOption === 'none') {
-        livingOption = 'cat';
-      } else if (livingOption === 'cat') {
-        livingOption = 'ice';
-      } else {
-        livingOption = 'none';
-      }
-      sound.playCountdown(true);
-      updateRoomSwitchUI();
+      cycleLivingOption();
     });
   }
 
