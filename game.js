@@ -23,6 +23,7 @@
   const timerBarFill = document.getElementById('timer-bar-fill');
 
   let titleEnterTime = performance.now();
+  let modeSelectEnterTime = 0;
 
   const titleScreen = document.getElementById('title-screen');
   const modeSelectScreen = document.getElementById('mode-select-screen');
@@ -121,7 +122,7 @@
     }
 
     initImageLoaders() {
-      const v = '33';
+      const v = '34';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -163,7 +164,7 @@
     }
 
     initSoundLoaders() {
-      const v = '33';
+      const v = '34';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -2545,10 +2546,12 @@
   // Step 1 Title Screen -> Tap anywhere -> Step 2 Mode Select Hub
   function handleTitleTap(e) {
     if (state !== 'TITLE') return;
+    if (performance.now() - titleEnterTime < 350) return;
     if (e && e.cancelable) e.preventDefault();
     sound.init();
     sound.playUIClick();
     state = 'MODESELECT';
+    modeSelectEnterTime = performance.now();
     titleScreen.classList.add('hidden');
     modeSelectScreen.classList.remove('hidden');
     updateRoomSwitchUI();
@@ -2567,10 +2570,11 @@
   }
 
   titleScreen.addEventListener('click', handleTitleTap);
-  titleScreen.addEventListener('pointerdown', handleTitleTap);
 
   // Step 2 Mode Select Hub -> Tap outside .hub-card -> Return to Step 1 Title Screen!
   modeSelectScreen.addEventListener('click', (e) => {
+    // Debounce ghost clicks originating from title screen tap release
+    if (performance.now() - modeSelectEnterTime < 350) return;
     if (e.target === modeSelectScreen) {
       goToTitleScreen();
     }
