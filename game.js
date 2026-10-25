@@ -117,7 +117,7 @@
     }
 
     initImageLoaders() {
-      const v = '26';
+      const v = '27';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -160,7 +160,7 @@
     }
 
     initSoundLoaders() {
-      const v = '26';
+      const v = '27';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -217,6 +217,10 @@
     drawImage(tCtx, key, x, y, w, h, angle = 0) {
       const img = this.images[key];
       if (!img) return false;
+      if (x === 0 && y === 0 && angle === 0) {
+        tCtx.drawImage(img, -w / 2, -h / 2, w, h);
+        return true;
+      }
       tCtx.save();
       tCtx.translate(x, y);
       if (angle !== 0) tCtx.rotate(angle);
