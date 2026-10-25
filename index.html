@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=49" />
+  <link rel="stylesheet" href="style.css?v=50" />
 </head>
 <body>
   <div id="app-wrapper">
@@ -72,13 +72,13 @@
           <div class="splash-logo-group">
             <div class="splash-en-sub">― HAMSTER DASH! ―</div>
             <h1 class="splash-title" aria-label="ハムダッシュ">
-              <img src="assets/images/title_logo.png?v=49" class="title-logo-img" alt="ハムダッシュ" />
+              <img src="assets/images/title_logo.png?v=50" class="title-logo-img" alt="ハムダッシュ" />
             </h1>
             <div class="splash-subtitle-pill">✨ タップで超高速おやつ集め ✨</div>
           </div>
 
           <div class="title-hero-stage">
-            <canvas id="title-hero-canvas" width="320" height="230"></canvas>
+            <canvas id="title-hero-canvas" width="400" height="280"></canvas>
           </div>
 
           <div class="tap-to-start">
@@ -87,7 +87,7 @@
             <span class="tap-paw">🐾</span>
           </div>
 
-          <div class="title-version-badge">ver 1.7.4</div>
+          <div class="title-version-badge">ver 1.7.5</div>
         </div>
       </div>
 
@@ -165,7 +165,7 @@
             <div class="rule-item">🧹 <span><strong>お掃除ロボ</strong>はエサやアイテムも吸引！増える<strong>毛糸玉・おもちゃ</strong>に当たると終了！</span></div>
             <div class="rule-item">⏱️ <span><strong>金色の時計</strong>で周囲がスローに！<strong>紫の毒キノコ</strong>は自分が遅くなるので注意！</span></div>
             <div class="rule-item">⛑️ <span>レアな<strong>ヘルメット</strong>を取ると、障害物に<strong>1度だけ当たっても跳ね返せる</strong>よ！</span></div>
-            <div class="rule-item">🎵 <span><strong>RHYTHMROOM</strong>では外周を回る<strong>8拍の光のリズム</strong>に合わせて移動！連続タップで予約移動もできるよ！</span></div>
+            <div class="rule-item">🎵 <span><strong>RHYTHMROOM</strong>では光るリズムに合わせて移動！ノリノリでタップしてね！</span></div>
           </div>
 
           <div class="food-guide-section">
@@ -252,7 +252,10 @@
             <div class="history-empty">まだプレイ履歴がありません</div>
           </div>
 
-          <button class="primary-btn" id="btn-close-stats">とじる</button>
+          <div class="stats-modal-footer">
+            <button type="button" class="clear-stats-btn" id="btn-clear-stats">🗑️ 記録消去</button>
+            <button class="primary-btn" id="btn-close-stats">とじる</button>
+          </div>
         </div>
       </div>
 
@@ -394,6 +397,6 @@
     </div>
   </div>
 
-  <script src="game.js?v=49"></script>
+  <script src="game.js?v=50"></script>
 </body>
 </html>

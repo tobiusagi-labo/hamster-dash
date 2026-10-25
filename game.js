@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '49';
+  const ASSET_VERSION = '50';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -59,6 +59,7 @@
   const btnCloseHowto = document.getElementById('btn-close-howto');
   const btnStats = document.getElementById('btn-stats');
   const btnCloseStats = document.getElementById('btn-close-stats');
+  const btnClearStats = document.getElementById('btn-clear-stats');
   const btnSettings = document.getElementById('btn-settings');
   const settingsModal = document.getElementById('settings-modal');
   const btnCloseSettings = document.getElementById('btn-close-settings');
@@ -1637,6 +1638,15 @@
     }
   }
 
+  function clearAllStats() {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.survival);
+      localStorage.removeItem(STORAGE_KEYS.timeattack);
+      localStorage.removeItem(STORAGE_KEYS.stats);
+    } catch (_) {}
+    renderStatsModalContent();
+  }
+
   function renderStatsModalContent() {
     const stats = getLifetimeStats();
     bestSurvivalEl.textContent = `${getBestScore('survival').toLocaleString()}点`;
@@ -3035,19 +3045,19 @@
         livingOptionBadge.classList.remove('hidden');
         if (livingOption === 'cat') {
           livingOptionBadge.classList.remove('ice-theme', 'normal-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+ (猫の手襲来)';
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🐾 Cat+';
         } else if (livingOption === 'ice') {
           livingOptionBadge.classList.add('ice-theme');
           livingOptionBadge.classList.remove('normal-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+ (つるつる床)';
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '❄️ Ice+';
         } else {
           livingOptionBadge.classList.add('normal-theme');
           livingOptionBadge.classList.remove('ice-theme');
-          if (livingOptionTextEl) livingOptionTextEl.textContent = '🏠 通常モード (タップで切替)';
+          if (livingOptionTextEl) livingOptionTextEl.textContent = '🏠 通常';
         }
       }
       if (hubCenterHamster) {
-        hubCenterHamster.title = `現在: ${livingOption.toUpperCase()}+ (タップで切替)`;
+        hubCenterHamster.title = livingOption === 'none' ? '通常' : `${livingOption.toUpperCase()}+`;
       }
     }
 
@@ -3218,6 +3228,16 @@
     sound.playUIClick();
     statsModal.classList.add('hidden');
   });
+
+  if (btnClearStats) {
+    btnClearStats.addEventListener('click', () => {
+      sound.init();
+      sound.playUIClick();
+      if (window.confirm('これまでのプレイ記録やハイスコアを消去しますか？\n（この操作は取り消せません）')) {
+        clearAllStats();
+      }
+    });
+  }
 
   if (btnSettings) {
     btnSettings.addEventListener('click', () => {
@@ -4771,8 +4791,8 @@
     if (roomType === 'living' && livingOption !== 'none') {
       ctx.save();
       const isIce = livingOption === 'ice';
-      const label = isIce ? '❄️ ICE+ (慣性アップ)' : '🐾 CAT+ (猫の手襲撃)';
-      const barW = isIce ? 134 : 142;
+      const label = isIce ? '❄️ ICE+' : '🐾 CAT+';
+      const barW = 88;
       const barX = (width - barW) / 2;
       ctx.fillStyle = isIce ? 'rgba(3, 105, 161, 0.85)' : 'rgba(194, 65, 12, 0.85)';
       roundRect(ctx, barX, statusOffsetY, barW, 16, 8);
@@ -6009,40 +6029,74 @@
   }
 
   /**
-   * Cute & Stylish Mascot Illustration for the Title Screen (#title-hero-canvas 240x216)
+   * Cute & Stylish Mascot Illustration for the Title Screen (#title-hero-canvas 400x280)
    */
   function drawCuteTitleMascot(tCtx, now) {
-    const cw = titleHeroCanvas ? titleHeroCanvas.width : 320;
-    const ch = titleHeroCanvas ? titleHeroCanvas.height : 230;
+    const cw = titleHeroCanvas ? titleHeroCanvas.width : 400;
+    const ch = titleHeroCanvas ? titleHeroCanvas.height : 280;
     tCtx.clearRect(0, 0, cw, ch);
 
     const cx = cw / 2;
-    const cy = ch / 2 + 2;
+    const cy = ch / 2 + 6;
 
     // Custom title mascot override if present
     if (assets.hasImage('title_mascot')) {
       const img = assets.getImage('title_mascot');
       if (img && img.naturalWidth && img.naturalHeight) {
         const aspect = img.naturalWidth / img.naturalHeight;
-        // Scaled up ~30% larger for prominent heroic display
-        let dw = 280;
-        let dh = dw / aspect;
-        if (dh > 192) {
-          dh = 192;
-          dw = dh * aspect;
+        // Scaled up ~45% larger for prominent heroic display
+        let dh = 236;
+        let dw = dh * aspect;
+        if (dw > cw - 8) {
+          dw = cw - 8;
+          dh = dw / aspect;
         }
 
-        // Slide in smoothly from right off-screen to center, then stay motionless (不動)
+        // Swoop in dramatically from right screen edge with jump arc & cute bounce
         const elapsed = Math.max(0, (now - titleEnterTime) / 1000);
-        const slideDuration = 0.65;
-        const startX = cw + dw / 2 + 30; // completely outside right canvas boundary
+        const slideDuration = 0.78;
+        const startX = cw + dw * 0.65; // completely beyond the right canvas edge
         const progress = Math.min(1, elapsed / slideDuration);
-        const ease = 1 - Math.pow(1 - progress, 4); // Quartic ease-out: swift glide with clean friction halt
-        const currentX = startX + (cx - startX) * ease;
 
-        assets.drawImage(tCtx, 'title_mascot', currentX, cy, dw, dh);
+        let currentX;
+        let jumpY = 0;
+        let angle = 0;
+
+        if (progress < 1) {
+          const p = progress;
+          const ease = 1 - Math.pow(1 - p, 3);
+          currentX = startX + (cx - startX) * ease;
+          // Parabolic jump arc while leaping from screen edge
+          jumpY = -Math.sin(p * Math.PI) * 26;
+          // Dynamic tilt during flight
+          angle = -0.06 * (1 - p);
+        } else {
+          currentX = cx;
+          // Gentle landing squash settling within 0.22s
+          const settleTime = elapsed - slideDuration;
+          if (settleTime < 0.22) {
+            const settleProgress = settleTime / 0.22;
+            const squash = Math.sin(settleProgress * Math.PI) * 6;
+            jumpY = squash;
+          } else {
+            jumpY = 0;
+          }
+          angle = 0;
+        }
+
+        // Soft ground shadow under hero hamster
+        const shadowAlpha = progress < 1 ? 0.12 + 0.14 * progress : 0.26;
+        const shadowScale = progress < 1 ? 0.7 + 0.3 * (1 - Math.abs(jumpY) / 26) : 1;
+        tCtx.save();
+        tCtx.fillStyle = `rgba(120, 53, 15, ${shadowAlpha})`;
+        tCtx.beginPath();
+        tCtx.ellipse(currentX, cy + dh * 0.44, (dw * 0.33) * shadowScale, 11 * shadowScale, 0, 0, Math.PI * 2);
+        tCtx.fill();
+        tCtx.restore();
+
+        assets.drawImage(tCtx, 'title_mascot', currentX, cy + jumpY, dw, dh, angle);
       } else {
-        assets.drawImage(tCtx, 'title_mascot', cx, cy, 240, 240);
+        assets.drawImage(tCtx, 'title_mascot', cx, cy, 320, 240);
       }
       return;
     }
