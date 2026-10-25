@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '44';
+  const ASSET_VERSION = '45';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -509,8 +509,8 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      // リビングのMP3音圧が高くHTML5直接出力のため0.20、リズムはWebAudio経由でmasterGainを通るため0.70で聴感上の音量を完全一致
-      const ratio = isRhythm ? 0.70 : 0.20;
+      // リビングのMP3は音圧が非常に高いため大幅に下げ(0.08)、リズムはWebAudio経由のため(0.75)に調整
+      const ratio = isRhythm ? 0.75 : 0.08;
       return Math.max(0, Math.min(1, this.volume * ratio));
     }
 
@@ -3662,11 +3662,8 @@
         }
         rhythmTimer = targetFrac * subBeatInterval;
 
-        // 2. Queued dash trigger: 6msの極小先行リードで早すぎず遅れのない完璧なジャストタイミングに調整
-        const QUEUED_DASH_LEAD_SEC = 0.006;
-        const queuedAudTime = curAudTime + QUEUED_DASH_LEAD_SEC;
-        const queuedTotalSteps = (queuedAudTime / quarterBeatInterval) * 2;
-        const queuedStep = Math.floor(queuedTotalSteps) % RHYTHM_BEATS;
+        // 2. Queued dash trigger: 0ms (完全同期・先行リードなし)
+        const queuedStep = targetStep;
 
         if (queuedStep !== lastQueuedStepIndex) {
           let crossedCorner = false;
