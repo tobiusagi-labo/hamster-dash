@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '46';
+  const ASSET_VERSION = '47';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -179,8 +179,9 @@
 
       for (const [key, src] of Object.entries(soundFiles)) {
         const aud = new Audio();
-        // living_bgm, living_bgm2 and rhythm_1 are preloaded for immediate readiness; others load on demand
-        aud.preload = (key.startsWith('living_bgm') || key === 'rhythm_1') ? 'auto' : 'none';
+        aud.volume = 0.038;
+        // living_bgm, living_bgm2 are preloaded for immediate readiness; rhythm tracks load into Web Audio buffer
+        aud.preload = key.startsWith('living_bgm') ? 'auto' : 'none';
         aud.src = src;
         this.sounds[key] = aud;
         aud.addEventListener('loadedmetadata', () => {
@@ -510,7 +511,7 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      if (isRhythm) {
+      if (isRhythm && this.rhythmBufferSource) {
         // Web Audio経由（dest -> limiter -> masterGain: volume適用）
         // SEとの合成時に0dBFSを超えないようヘッドルームを確保し、一定の音量を安定維持
         return 0.45;
@@ -521,12 +522,21 @@
       return Math.max(0, Math.min(1, this.volume * livingRatio));
     }
 
-    loadRhythmBuffer(trackKey) {
+    loadRhythmBuffer(trackKey, onLoaded) {
       if (!this.ctx || !trackKey) return;
+      if (this.audioBuffers[trackKey]) {
+        if (onLoaded) onLoaded(this.audioBuffers[trackKey]);
+        return;
+      }
+      if (!this.bufferCallbacks) this.bufferCallbacks = {};
+      if (onLoaded) {
+        if (!this.bufferCallbacks[trackKey]) this.bufferCallbacks[trackKey] = [];
+        this.bufferCallbacks[trackKey].push(onLoaded);
+      }
+      if (this.loadingBuffers && this.loadingBuffers[trackKey]) return;
       if (!this.loadingBuffers) this.loadingBuffers = {};
-      if (this.audioBuffers[trackKey] || this.loadingBuffers[trackKey]) return;
       this.loadingBuffers[trackKey] = true;
-      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '46';
+      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '47';
       const src = `assets/sounds/${trackKey}.mp3?v=${v}`;
       fetch(src)
         .then(res => {
@@ -537,10 +547,13 @@
         .then(decoded => {
           this.audioBuffers[trackKey] = decoded;
           delete this.loadingBuffers[trackKey];
-          // HTML5 Audioフォールバック中にバッファが準備できた場合、即座にシームレス移行
-          if (this.currentBgmKey === trackKey && !this.rhythmBufferSource && this.playerA && !this.playerA.paused) {
-            const curPos = this.playerA.currentTime || 0;
-            this.playBgmFile(trackKey, true, curPos, true);
+          const cbs = this.bufferCallbacks[trackKey];
+          if (cbs) {
+            delete this.bufferCallbacks[trackKey];
+            cbs.forEach(cb => { try { cb(decoded); } catch (_) {} });
+          }
+          if (this.currentBgmKey === trackKey && !this.rhythmBufferSource) {
+            this.playBgmFile(trackKey, true, 0, true);
           }
         })
         .catch(() => {
@@ -548,12 +561,28 @@
         });
     }
 
+    preloadAllRhythmBuffers() {
+      if (!this.ctx) return;
+      for (let i = 1; i <= 6; i++) {
+        this.loadRhythmBuffer(`rhythm_${i}`);
+      }
+    }
+
     playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
       // 1. Web Audio buffer playback for Rhythm Room (0ms latency start, sample-accurate, zero drift)
       if (key.startsWith('rhythm_')) {
+        this.currentBgmKey = key;
         if (!this.audioBuffers[key]) {
-          this.loadRhythmBuffer(key);
-        } else if (this.ctx) {
+          this.loadRhythmBuffer(key, () => {
+            if (this.currentBgmKey === key && !this.rhythmBufferSource) {
+              this.playBgmFile(key, loop, startOffset, true);
+            }
+          });
+          // バッファのデコード完了を待機（※音割れ・爆音の原因となるHTML5 Audioへのフォールバックは行わない）
+          return true;
+        }
+
+        if (this.ctx) {
           if (!forceRestart && this.currentBgmKey === key && this.rhythmBufferSource && !this.isRhythmPaused) {
             this.syncBgmVolume();
             return true;
@@ -562,7 +591,10 @@
           this.currentBgmKey = key;
           const targetVol = this.getTargetBgmVolume();
           const gainNode = this.ctx.createGain();
-          gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+          // 初期音圧スパイク・クリックノイズを100%防止するため0から30msで滑らかにフェードイン
+          gainNode.gain.value = 0;
+          gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
+          gainNode.gain.linearRampToValueAtTime(targetVol, this.ctx.currentTime + 0.03);
           gainNode.connect(this.dest);
 
           const source = this.ctx.createBufferSource();
@@ -676,15 +708,27 @@
 
     stopBgmFile() {
       if (this.rhythmBufferSource) {
-        try {
-          this.rhythmBufferSource.stop();
-          this.rhythmBufferSource.disconnect();
-        } catch (_) {}
+        const src = this.rhythmBufferSource;
+        const gain = this.rhythmBufferGain;
         this.rhythmBufferSource = null;
-      }
-      if (this.rhythmBufferGain) {
-        try { this.rhythmBufferGain.disconnect(); } catch (_) {}
         this.rhythmBufferGain = null;
+        if (gain && this.ctx) {
+          try {
+            gain.gain.setValueAtTime(gain.gain.value, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.02);
+            setTimeout(() => {
+              try {
+                src.stop();
+                src.disconnect();
+                gain.disconnect();
+              } catch (_) {}
+            }, 25);
+          } catch (_) {
+            try { src.stop(); src.disconnect(); gain.disconnect(); } catch (_) {}
+          }
+        } else {
+          try { src.stop(); src.disconnect(); } catch (_) {}
+        }
       }
       this.isRhythmPaused = false;
       this.rhythmStartTime = 0;
@@ -814,6 +858,9 @@
           for (let i = 0; i < length; i++) {
             data[i] = Math.random() * 2 - 1;
           }
+
+          // Preload all 6 rhythm tracks into Web Audio buffers immediately
+          this.preloadAllRhythmBuffers();
         }
       }
       if (this.ctx && this.ctx.state === 'suspended') {
@@ -2245,7 +2292,6 @@
 
   // --- Increasing Obstacles: Rolling Yarn Ball & Cat Toy ---
   function spawnObstacle(immediate = false) {
-    if (roomType === 'rhythm') return; // Rhythm Room Debug Mode: No enemies
     const margin = 40;
     const minY = HUD_TOP_MARGIN + margin;
     const maxY = height - margin;
@@ -2453,14 +2499,13 @@
     floatingTexts = [];
     targetRipples = [];
 
-    if (roomType === 'rhythm') {
-      vacuum = null;
-      obstacles = [];
-      catPaw.active = false;
+    initVacuum();
+    spawnObstacle(true);
+    nextObstacleTimer = 7.5;
+    if (roomType === 'living' && livingOption === 'cat') {
+      nextCatPawTimer = randRange(8, 14);
     } else {
-      initVacuum();
-      spawnObstacle(true);
-      nextObstacleTimer = 7.5;
+      catPaw.active = false;
     }
 
     spawnFood(FOOD_TYPES[0]);
@@ -3858,14 +3903,12 @@
       }
     }
 
-    // --- Spawn Additional Obstacles Over Time (LIVING ROOM only; Rhythm Room is Debug Mode) ---
-    if (roomType !== 'rhythm') {
-      const maxExtraObstacles = Math.min(6, 1 + Math.floor(elapsedTime / 11));
-      nextObstacleTimer -= worldDt;
-      if (obstacles.length < maxExtraObstacles && nextObstacleTimer <= 0) {
-        spawnObstacle(false);
-        nextObstacleTimer = randRange(7.5, 10.5);
-      }
+    // --- Spawn Additional Obstacles Over Time ---
+    const maxExtraObstacles = Math.min(6, 1 + Math.floor(elapsedTime / 11));
+    nextObstacleTimer -= worldDt;
+    if (obstacles.length < maxExtraObstacles && nextObstacleTimer <= 0) {
+      spawnObstacle(false);
+      nextObstacleTimer = randRange(7.5, 10.5);
     }
 
     // --- Update the Single Robot Vacuum ---
@@ -4278,9 +4321,6 @@
   }
 
   function checkAllCollisions() {
-    if (roomType === 'rhythm') {
-      return false; // Rhythm Room Debug Mode: No enemy collision/death!
-    }
     if (player.helmetInvulnTimer > 0) {
       return false;
     }
@@ -4436,27 +4476,6 @@
       const frac = clamp(rhythmTimer / subBeatInterval, 0, 1);
       currentContinuousStep = ((currentBeatIndex + frac) % 8);
     }
-
-    // Rhythm Room Debug Mode Badge at top center
-    ctx.save();
-    ctx.font = `800 12px ${POP_FONT}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const badgeText = '🛠️ リズム検証モード (4拍移動・敵なし)';
-    const textWidth = ctx.measureText(badgeText).width;
-    const badgeW = textWidth + 18;
-    const badgeH = 22;
-    const badgeX = rx + rw * 0.5;
-    const badgeY = ry + 22;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    roundRect(ctx, badgeX - badgeW * 0.5, badgeY - badgeH * 0.5, badgeW, badgeH, 11);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(236, 72, 153, 0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#f472b6';
-    ctx.fillText(badgeText, badgeX, badgeY + 1);
-    ctx.restore();
 
     // 1. Draw glowing comet trail of the orbiting light along the perimeter
     const trailSteps = 18;
