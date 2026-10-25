@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '36';
+  const ASSET_VERSION = '37';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -123,7 +123,7 @@
     }
 
     initImageLoaders() {
-      const v = '34';
+      const v = ASSET_VERSION;
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -513,55 +513,61 @@
       return Math.max(0, Math.min(1, this.volume * baseRatio));
     }
 
-    loadRhythmBuffers() {
-      if (!this.ctx) return;
-      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '36';
-      for (let i = 1; i <= 6; i++) {
-        const key = `rhythm_${i}`;
-        if (this.audioBuffers[key]) continue;
-        const src = `assets/sounds/${key}.mp3?v=${v}`;
-        fetch(src)
-          .then(res => {
-            if (!res.ok) throw new Error('status ' + res.status);
-            return res.arrayBuffer();
-          })
-          .then(buf => this.ctx.decodeAudioData(buf))
-          .then(decoded => {
-            this.audioBuffers[key] = decoded;
-          })
-          .catch(() => {});
-      }
+    loadRhythmBuffer(trackKey) {
+      if (!this.ctx || !trackKey) return;
+      if (!this.loadingBuffers) this.loadingBuffers = {};
+      if (this.audioBuffers[trackKey] || this.loadingBuffers[trackKey]) return;
+      this.loadingBuffers[trackKey] = true;
+      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '37';
+      const src = `assets/sounds/${trackKey}.mp3?v=${v}`;
+      fetch(src)
+        .then(res => {
+          if (!res.ok) throw new Error('status ' + res.status);
+          return res.arrayBuffer();
+        })
+        .then(buf => this.ctx.decodeAudioData(buf))
+        .then(decoded => {
+          this.audioBuffers[trackKey] = decoded;
+          delete this.loadingBuffers[trackKey];
+        })
+        .catch(() => {
+          delete this.loadingBuffers[trackKey];
+        });
     }
 
     playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
       // 1. Web Audio buffer playback for Rhythm Room (0ms latency start, sample-accurate, zero drift)
-      if (key.startsWith('rhythm_') && this.ctx && this.audioBuffers[key]) {
-        if (!forceRestart && this.currentBgmKey === key && this.rhythmBufferSource && !this.isRhythmPaused) {
-          this.syncBgmVolume();
+      if (key.startsWith('rhythm_')) {
+        if (!this.audioBuffers[key]) {
+          this.loadRhythmBuffer(key);
+        } else if (this.ctx) {
+          if (!forceRestart && this.currentBgmKey === key && this.rhythmBufferSource && !this.isRhythmPaused) {
+            this.syncBgmVolume();
+            return true;
+          }
+          this.stopBgmFile();
+          this.currentBgmKey = key;
+          const targetVol = this.getTargetBgmVolume();
+          const gainNode = this.ctx.createGain();
+          gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+          gainNode.connect(this.dest);
+
+          const source = this.ctx.createBufferSource();
+          source.buffer = this.audioBuffers[key];
+          source.loop = loop;
+          source.connect(gainNode);
+
+          const now = this.ctx.currentTime;
+          const offset = Math.max(0, startOffset);
+          source.start(now, offset);
+
+          this.rhythmBufferSource = source;
+          this.rhythmBufferGain = gainNode;
+          this.rhythmStartTime = now - offset;
+          this.isRhythmPaused = false;
+          this.rhythmPauseOffset = 0;
           return true;
         }
-        this.stopBgmFile();
-        this.currentBgmKey = key;
-        const targetVol = this.getTargetBgmVolume();
-        const gainNode = this.ctx.createGain();
-        gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
-        gainNode.connect(this.dest);
-
-        const source = this.ctx.createBufferSource();
-        source.buffer = this.audioBuffers[key];
-        source.loop = loop;
-        source.connect(gainNode);
-
-        const now = this.ctx.currentTime;
-        const offset = Math.max(0, startOffset);
-        source.start(now, offset);
-
-        this.rhythmBufferSource = source;
-        this.rhythmBufferGain = gainNode;
-        this.rhythmStartTime = now - offset;
-        this.isRhythmPaused = false;
-        this.rhythmPauseOffset = 0;
-        return true;
       }
 
       // 2. HTML5 Audio element fallback (or Living Room BGM)
@@ -790,7 +796,6 @@
       if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume();
       }
-      this.loadRhythmBuffers();
     }
 
     getAudioWaveData(targetArray) {
@@ -2343,7 +2348,8 @@
 
     if (roomType === 'rhythm') {
       sound.stopBgmFile();
-      sound.loadRhythmBuffers();
+      const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
+      sound.loadRhythmBuffer(trackKey);
     } else {
       syncRoomBgm(true);
     }
@@ -4369,7 +4375,7 @@
 
     // Rhythm Room Debug Mode Badge at top center
     ctx.save();
-    ctx.font = `800 12px ${FONT_FAMILY}`;
+    ctx.font = `800 12px ${POP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const badgeText = '🛠️ 拍確認デバッグモード (敵なし・無敵)';
