@@ -7,6 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
+  const ASSET_VERSION = '36';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -164,7 +165,7 @@
     }
 
     initSoundLoaders() {
-      const v = '34';
+      const v = ASSET_VERSION;
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -468,6 +469,14 @@
       this.timeData = null;
       this.freqData = null;
       this.mediaSources = new WeakMap();
+
+      // Web Audio Buffer Cache for Zero-Latency, Sample-Accurate Rhythm Tracks
+      this.audioBuffers = {};
+      this.rhythmBufferSource = null;
+      this.rhythmBufferGain = null;
+      this.rhythmStartTime = 0;
+      this.rhythmPauseOffset = 0;
+      this.isRhythmPaused = false;
       try {
         const savedBgm = localStorage.getItem('hamster_dash_bgm_muted_v2');
         if (savedBgm !== null) this.bgmMuted = savedBgm === 'true';
@@ -504,7 +513,58 @@
       return Math.max(0, Math.min(1, this.volume * baseRatio));
     }
 
+    loadRhythmBuffers() {
+      if (!this.ctx) return;
+      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '36';
+      for (let i = 1; i <= 6; i++) {
+        const key = `rhythm_${i}`;
+        if (this.audioBuffers[key]) continue;
+        const src = `assets/sounds/${key}.mp3?v=${v}`;
+        fetch(src)
+          .then(res => {
+            if (!res.ok) throw new Error('status ' + res.status);
+            return res.arrayBuffer();
+          })
+          .then(buf => this.ctx.decodeAudioData(buf))
+          .then(decoded => {
+            this.audioBuffers[key] = decoded;
+          })
+          .catch(() => {});
+      }
+    }
+
     playBgmFile(key, loop = true, startOffset = 0, forceRestart = false) {
+      // 1. Web Audio buffer playback for Rhythm Room (0ms latency start, sample-accurate, zero drift)
+      if (key.startsWith('rhythm_') && this.ctx && this.audioBuffers[key]) {
+        if (!forceRestart && this.currentBgmKey === key && this.rhythmBufferSource && !this.isRhythmPaused) {
+          this.syncBgmVolume();
+          return true;
+        }
+        this.stopBgmFile();
+        this.currentBgmKey = key;
+        const targetVol = this.getTargetBgmVolume();
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+        gainNode.connect(this.dest);
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.audioBuffers[key];
+        source.loop = loop;
+        source.connect(gainNode);
+
+        const now = this.ctx.currentTime;
+        const offset = Math.max(0, startOffset);
+        source.start(now, offset);
+
+        this.rhythmBufferSource = source;
+        this.rhythmBufferGain = gainNode;
+        this.rhythmStartTime = now - offset;
+        this.isRhythmPaused = false;
+        this.rhythmPauseOffset = 0;
+        return true;
+      }
+
+      // 2. HTML5 Audio element fallback (or Living Room BGM)
       const primary = assets.getSound(key);
       if (!primary) {
         this.stopBgmFile();
@@ -532,7 +592,7 @@
       const isRhythm = key.startsWith('rhythm_');
       if (isRhythm) {
         this.playerA.loop = true;
-        this.bgmLoopEnabled = false; // リズム曲は早すぎるクロスフェードを避け、小節がズレないネイティブループ
+        this.bgmLoopEnabled = false;
       } else {
         this.playerA.loop = false;
         this.bgmLoopEnabled = loop;
@@ -541,7 +601,6 @@
       const targetVol = this.getTargetBgmVolume();
       this.playerA.volume = targetVol;
       this.playerB.volume = 0;
-      // <audio>タグはWeb Audioルーティング(createMediaElementSource)による音量減衰やバグを避けるためネイティブ直接再生
       try {
         this.playerA.currentTime = Math.max(0, startOffset);
         const p = this.playerA.play();
@@ -597,6 +656,21 @@
     }
 
     stopBgmFile() {
+      if (this.rhythmBufferSource) {
+        try {
+          this.rhythmBufferSource.stop();
+          this.rhythmBufferSource.disconnect();
+        } catch (_) {}
+        this.rhythmBufferSource = null;
+      }
+      if (this.rhythmBufferGain) {
+        try { this.rhythmBufferGain.disconnect(); } catch (_) {}
+        this.rhythmBufferGain = null;
+      }
+      this.isRhythmPaused = false;
+      this.rhythmStartTime = 0;
+      this.rhythmPauseOffset = 0;
+
       if (this.playerA) {
         try {
           this.playerA.pause();
@@ -616,8 +690,63 @@
       this.crossfadeProgress = 0;
     }
 
+    pauseBgm() {
+      if (this.rhythmBufferSource && this.ctx && !this.isRhythmPaused) {
+        const elapsed = this.ctx.currentTime - this.rhythmStartTime;
+        this.rhythmPauseOffset = elapsed;
+        this.isRhythmPaused = true;
+        try {
+          this.rhythmBufferSource.stop();
+          this.rhythmBufferSource.disconnect();
+        } catch (_) {}
+        this.rhythmBufferSource = null;
+      }
+      if (this.playerA) {
+        try { this.playerA.pause(); } catch (_) {}
+      }
+      if (this.playerB) {
+        try { this.playerB.pause(); } catch (_) {}
+      }
+    }
+
+    resumeBgm() {
+      if (this.isRhythmPaused && this.currentBgmKey && this.audioBuffers[this.currentBgmKey] && this.ctx) {
+        const key = this.currentBgmKey;
+        const offset = this.rhythmPauseOffset;
+        const targetVol = this.getTargetBgmVolume();
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+        gainNode.connect(this.dest);
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.audioBuffers[key];
+        source.loop = true;
+        source.connect(gainNode);
+
+        const now = this.ctx.currentTime;
+        const dur = source.buffer.duration;
+        const startPos = dur > 0 ? (offset % dur) : 0;
+        source.start(now, startPos);
+
+        this.rhythmBufferSource = source;
+        this.rhythmBufferGain = gainNode;
+        this.rhythmStartTime = now - startPos;
+        this.isRhythmPaused = false;
+        return;
+      }
+      if (!this.muted) {
+        const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
+        const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
+        if (active) active.play().catch(() => {});
+        if (this.crossfading && standby) standby.play().catch(() => {});
+      }
+    }
+
     syncBgmVolume() {
       const targetVol = this.getTargetBgmVolume();
+      if (this.rhythmBufferGain && this.ctx) {
+        this.rhythmBufferGain.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+      }
       if (!this.crossfading) {
         if (this.playerA && this.activeSlot === 'a') this.playerA.volume = targetVol;
         if (this.playerB && this.activeSlot === 'b') this.playerB.volume = targetVol;
@@ -661,6 +790,7 @@
       if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume();
       }
+      this.loadRhythmBuffers();
     }
 
     getAudioWaveData(targetArray) {
@@ -2082,6 +2212,7 @@
 
   // --- Increasing Obstacles: Rolling Yarn Ball & Cat Toy ---
   function spawnObstacle(immediate = false) {
+    if (roomType === 'rhythm') return; // Rhythm Room Debug Mode: No enemies
     const margin = 40;
     const minY = HUD_TOP_MARGIN + margin;
     const maxY = height - margin;
@@ -2212,6 +2343,7 @@
 
     if (roomType === 'rhythm') {
       sound.stopBgmFile();
+      sound.loadRhythmBuffers();
     } else {
       syncRoomBgm(true);
     }
@@ -2286,9 +2418,15 @@
     floatingTexts = [];
     targetRipples = [];
 
-    initVacuum();
-    spawnObstacle(true);
-    nextObstacleTimer = 7.5;
+    if (roomType === 'rhythm') {
+      vacuum = null;
+      obstacles = [];
+      catPaw.active = false;
+    } else {
+      initVacuum();
+      spawnObstacle(true);
+      nextObstacleTimer = 7.5;
+    }
 
     spawnFood(FOOD_TYPES[0]);
     spawnFood(FOOD_TYPES[0]);
@@ -2613,8 +2751,7 @@
     sound.init();
     sound.playUIClick();
     isPaused = true;
-    if (sound.playerA) sound.playerA.pause();
-    if (sound.playerB) sound.playerB.pause();
+    sound.pauseBgm();
     pauseOpenedTime = Date.now();
     sound.syncVolumeUI();
     if (pauseModal) pauseModal.classList.remove('hidden');
@@ -2625,12 +2762,7 @@
     sound.init();
     sound.playUIClick();
     isPaused = false;
-    if (!sound.muted) {
-      const active = sound.activeSlot === 'a' ? sound.playerA : sound.playerB;
-      const standby = sound.activeSlot === 'a' ? sound.playerB : sound.playerA;
-      if (active) active.play().catch(() => {});
-      if (sound.crossfading && standby) standby.play().catch(() => {});
-    }
+    sound.resumeBgm();
     lastTime = performance.now();
     if (pauseModal) pauseModal.classList.add('hidden');
   }
@@ -3487,21 +3619,46 @@
       const subBeatInterval = quarterBeatInterval * 0.5;
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
 
-      rhythmTimer += rawDt;
-      while (rhythmTimer >= subBeatInterval) {
-        rhythmTimer -= subBeatInterval;
-        currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
-        const isCorner = currentBeatIndex % 2 === 0;
-        rhythmBeatPulse = isCorner ? 1.0 : 0.55;
-        sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
+      if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
+        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime);
+        const totalSteps = (curAudTime / quarterBeatInterval) * 2;
+        const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
+        const targetFrac = totalSteps % 1.0;
 
-        if (isCorner) {
-          if (rhythmTapQueue.length > 0) {
-            const nextTap = rhythmTapQueue.shift();
-            executeDashTo(nextTap.x, nextTap.y);
-            beatDashedBeatIndex = currentBeatIndex;
-          } else {
-            beatDashedBeatIndex = -1;
+        if (targetStep !== currentBeatIndex) {
+          currentBeatIndex = targetStep;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+
+          // Corner downbeats (表拍: 1, 2, 3, 4拍目) trigger queued dashes!
+          if (isCorner) {
+            if (rhythmTapQueue.length > 0) {
+              const nextTap = rhythmTapQueue.shift();
+              executeDashTo(nextTap.x, nextTap.y);
+              beatDashedBeatIndex = currentBeatIndex;
+            } else {
+              beatDashedBeatIndex = -1;
+            }
+          }
+        }
+        rhythmTimer = targetFrac * subBeatInterval;
+      } else {
+        rhythmTimer += rawDt;
+        while (rhythmTimer >= subBeatInterval) {
+          rhythmTimer -= subBeatInterval;
+          currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
+          const isCorner = currentBeatIndex % 2 === 0;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+          sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
+
+          if (isCorner) {
+            if (rhythmTapQueue.length > 0) {
+              const nextTap = rhythmTapQueue.shift();
+              executeDashTo(nextTap.x, nextTap.y);
+              beatDashedBeatIndex = currentBeatIndex;
+            } else {
+              beatDashedBeatIndex = -1;
+            }
           }
         }
       }
@@ -3632,12 +3789,14 @@
       }
     }
 
-    // --- Spawn Additional Obstacles Over Time ---
-    const maxExtraObstacles = Math.min(6, 1 + Math.floor(elapsedTime / 11));
-    nextObstacleTimer -= worldDt;
-    if (obstacles.length < maxExtraObstacles && nextObstacleTimer <= 0) {
-      spawnObstacle(false);
-      nextObstacleTimer = randRange(7.5, 10.5);
+    // --- Spawn Additional Obstacles Over Time (LIVING ROOM only; Rhythm Room is Debug Mode) ---
+    if (roomType !== 'rhythm') {
+      const maxExtraObstacles = Math.min(6, 1 + Math.floor(elapsedTime / 11));
+      nextObstacleTimer -= worldDt;
+      if (obstacles.length < maxExtraObstacles && nextObstacleTimer <= 0) {
+        spawnObstacle(false);
+        nextObstacleTimer = randRange(7.5, 10.5);
+      }
     }
 
     // --- Update the Single Robot Vacuum ---
@@ -4050,6 +4209,9 @@
   }
 
   function checkAllCollisions() {
+    if (roomType === 'rhythm') {
+      return false; // Rhythm Room Debug Mode: No enemy collision/death!
+    }
     if (player.helmetInvulnTimer > 0) {
       return false;
     }
@@ -4196,10 +4358,35 @@
     if (state === 'COUNTDOWN') {
       const beatsElapsed = clamp(4.0 - countdownTimer, 0, 4.0);
       currentContinuousStep = ((beatsElapsed * 2) % 8);
+    } else if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
+      const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime);
+      const totalSteps = (curAudTime / quarterBeatInterval) * 2;
+      currentContinuousStep = ((totalSteps % 8) + 8) % 8;
     } else {
       const frac = clamp(rhythmTimer / subBeatInterval, 0, 1);
       currentContinuousStep = ((currentBeatIndex + frac) % 8);
     }
+
+    // Rhythm Room Debug Mode Badge at top center
+    ctx.save();
+    ctx.font = `800 12px ${FONT_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const badgeText = '🛠️ 拍確認デバッグモード (敵なし・無敵)';
+    const textWidth = ctx.measureText(badgeText).width;
+    const badgeW = textWidth + 18;
+    const badgeH = 22;
+    const badgeX = rx + rw * 0.5;
+    const badgeY = ry + 22;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    roundRect(ctx, badgeX - badgeW * 0.5, badgeY - badgeH * 0.5, badgeW, badgeH, 11);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(236, 72, 153, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#f472b6';
+    ctx.fillText(badgeText, badgeX, badgeY + 1);
+    ctx.restore();
 
     // 1. Draw glowing comet trail of the orbiting light along the perimeter
     const trailSteps = 18;
