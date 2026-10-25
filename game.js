@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '39';
+  const ASSET_VERSION = '40';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -1203,7 +1203,10 @@
      */
     playLivingBgmStep(stepIndex) {
       if (this.bgmMuted || !this.ctx) return;
-      if (assets.hasSound('living_bgm') && this.currentBgmAudio) {
+      const livingTrack = (typeof LIVING_TRACKS !== 'undefined' && typeof livingTrackIndex !== 'undefined')
+        ? (LIVING_TRACKS[livingTrackIndex % LIVING_TRACKS.length] || LIVING_TRACKS[0])
+        : { id: 'living_bgm' };
+      if (assets.hasSound(livingTrack.id) || assets.hasSound('living_bgm') || this.currentBgmAudio || this.rhythmBufferSource || this.currentBgmKey) {
         return;
       }
       const now = this.ctx.currentTime;
@@ -1279,7 +1282,7 @@
     playRhythmBeat(beatIndex, trackIdx = 0) {
       if (this.bgmMuted || !this.ctx) return;
       const trackKey = `rhythm_${(trackIdx % RHYTHM_TRACKS.length) + 1}`;
-      if (assets.hasSound(trackKey) && this.currentBgmAudio) {
+      if (assets.hasSound(trackKey) || this.currentBgmAudio || this.rhythmBufferSource || this.currentBgmKey === trackKey) {
         return;
       }
       const now = this.ctx.currentTime;
@@ -1663,6 +1666,7 @@
 
   // 8-Beat Rhythm Room State (5 selectable tracks, BPM 160~180)
   const RHYTHM_BEATS = 8;
+  const RHYTHM_AUDIO_LATENCY_COMPENSATION = 0.048; // 48ms forward compensation for audio buffer queue, speaker output latency & 60fps frame quantization
   let rhythmTrackIndex = 0;
   let hamsterTapPulseTimer = 0;
   let previewTimeouts = [];
@@ -2698,12 +2702,10 @@
     if (roomType === 'living') {
       livingBgmTimer = 0;
       livingBgmStep = 0;
-      sound.playLivingBgmStep(0);
     } else {
       clearTrackPreview();
       rhythmTimer = 0;
       currentBeatIndex = 0;
-      sound.playRhythmBeat(0, rhythmTrackIndex);
     }
     syncRoomBgm();
   }
@@ -2983,15 +2985,14 @@
       return; // Already active, no duplicate flip
     }
     clearTrackPreview();
+    sound.stopBgmFile();
     if (roomType === 'rhythm') {
       rhythmTimer = 0;
       currentBeatIndex = 0;
-      sound.playRhythmBeat(0, rhythmTrackIndex);
     } else {
       sound.playUIClick();
       livingBgmTimer = 0;
       livingBgmStep = 0;
-      sound.playLivingBgmStep(0);
     }
     updateRoomSwitchUI();
     syncRoomBgm(true);
@@ -2999,13 +3000,13 @@
 
   function changeRhythmTrack(delta) {
     sound.init();
+    sound.stopBgmFile();
     rhythmTrackIndex = (rhythmTrackIndex + delta + RHYTHM_TRACKS.length) % RHYTHM_TRACKS.length;
     hamsterTapPulseTimer = 0.36;
     rhythmTimer = 0;
     currentBeatIndex = 0;
-    sound.playRhythmBeat(0, rhythmTrackIndex);
     updateRoomSwitchUI();
-    syncRoomBgm();
+    syncRoomBgm(true);
   }
 
   if (pillLiving) {
@@ -3281,6 +3282,7 @@
   // Game Over -> Return to Room Select Screen
   function goToRoomSelect() {
     sound.init();
+    sound.stopBgmFile();
     sound.playUIClick();
     clearTrackPreview();
     isPaused = false;
@@ -3295,13 +3297,11 @@
     if (roomType === 'living') {
       livingBgmTimer = 0;
       livingBgmStep = 0;
-      sound.playLivingBgmStep(0);
     } else {
       rhythmTimer = 0;
       currentBeatIndex = 0;
-      sound.playRhythmBeat(0, rhythmTrackIndex);
     }
-    syncRoomBgm();
+    syncRoomBgm(true);
   }
 
   if (btnResultRoom) {
@@ -3626,18 +3626,31 @@
       rhythmBeatPulse = Math.max(0, rhythmBeatPulse - rawDt * 4.5);
 
       if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
-        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime);
+        const userOffsetSec = (sound.timingOffsetMs || 0) * 0.001;
+        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + RHYTHM_AUDIO_LATENCY_COMPENSATION + userOffsetSec);
         const totalSteps = (curAudTime / quarterBeatInterval) * 2;
         const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
         const targetFrac = totalSteps % 1.0;
 
         if (targetStep !== currentBeatIndex) {
+          // Robust corner crossing check: ensures frame drops don't skip corner triggers
+          let crossedCorner = false;
+          let checkStep = (currentBeatIndex + 1) % RHYTHM_BEATS;
+          while (true) {
+            if (checkStep % 2 === 0) {
+              crossedCorner = true;
+              break;
+            }
+            if (checkStep === targetStep) break;
+            checkStep = (checkStep + 1) % RHYTHM_BEATS;
+          }
+
           currentBeatIndex = targetStep;
           const isCorner = currentBeatIndex % 2 === 0;
-          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+          if (isCorner || crossedCorner) {
+            rhythmBeatPulse = 1.0;
 
-          // 四隅の表拍（1, 2, 3, 4拍目）でのみダッシュ発動！
-          if (isCorner) {
+            // 四隅の表拍（1, 2, 3, 4拍目）でのみ予約ダッシュ発動！
             if (rhythmTapQueue.length > 0) {
               const nextTap = rhythmTapQueue.shift();
               executeDashTo(nextTap.x, nextTap.y);
@@ -3645,6 +3658,8 @@
             } else {
               beatDashedBeatIndex = -1;
             }
+          } else {
+            rhythmBeatPulse = 0.55;
           }
         }
         rhythmTimer = targetFrac * subBeatInterval;
@@ -4366,7 +4381,8 @@
       const beatsElapsed = clamp(4.0 - countdownTimer, 0, 4.0);
       currentContinuousStep = ((beatsElapsed * 2) % 8);
     } else if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
-      const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime);
+      const userOffsetSec = (sound.timingOffsetMs || 0) * 0.001;
+      const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + RHYTHM_AUDIO_LATENCY_COMPENSATION + userOffsetSec);
       const totalSteps = (curAudTime / quarterBeatInterval) * 2;
       currentContinuousStep = ((totalSteps % 8) + 8) % 8;
     } else {
