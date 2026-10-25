@@ -78,6 +78,7 @@
   };
   const btnPauseSe = document.getElementById('btn-pause-se');
   const btnRetry = document.getElementById('btn-retry');
+  const btnResultRoom = document.getElementById('btn-result-room');
   const btnHome = document.getElementById('btn-home');
 
   const hubCard = document.getElementById('hub-card');
@@ -117,7 +118,7 @@
     }
 
     initImageLoaders() {
-      const v = '27';
+      const v = '28';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -160,7 +161,7 @@
     }
 
     initSoundLoaders() {
-      const v = '27';
+      const v = '28';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -3123,6 +3124,36 @@
   }
 
   btnRetry.addEventListener('click', () => startGame(gameMode));
+
+  // Game Over -> Return to Room Select Screen
+  function goToRoomSelect() {
+    sound.init();
+    sound.playUIClick();
+    clearTrackPreview();
+    isPaused = false;
+    state = 'MODESELECT';
+    if (pauseModal) pauseModal.classList.add('hidden');
+    gameoverScreen.classList.add('hidden');
+    titleScreen.classList.add('hidden');
+    hud.classList.add('hidden');
+    modeSelectScreen.classList.remove('hidden');
+    updateRoomSwitchUI();
+    renderStatsModalContent();
+    if (roomType === 'living') {
+      livingBgmTimer = 0;
+      livingBgmStep = 0;
+      sound.playLivingBgmStep(0);
+    } else {
+      rhythmTimer = 0;
+      currentBeatIndex = 0;
+      sound.playRhythmBeat(0, rhythmTrackIndex);
+    }
+    syncRoomBgm();
+  }
+
+  if (btnResultRoom) {
+    btnResultRoom.addEventListener('click', goToRoomSelect);
+  }
 
   // Game Over -> Return to Title Screen first!
   function goToTitleScreen() {
