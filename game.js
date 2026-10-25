@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '45';
+  const ASSET_VERSION = '46';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -451,6 +451,7 @@
     constructor() {
       this.ctx = null;
       this.masterGain = null;
+      this.limiter = null;
       this.noiseBuffer = null;
       this.bgmMuted = false;
       this.seMuted = false;
@@ -509,9 +510,15 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      // リビングのMP3は音圧が非常に高いため大幅に下げ(0.08)、リズムはWebAudio経由のため(0.75)に調整
-      const ratio = isRhythm ? 0.75 : 0.08;
-      return Math.max(0, Math.min(1, this.volume * ratio));
+      if (isRhythm) {
+        // Web Audio経由（dest -> limiter -> masterGain: volume適用）
+        // SEとの合成時に0dBFSを超えないようヘッドルームを確保し、一定の音量を安定維持
+        return 0.45;
+      }
+      // リビングのHTML5 Audio経由（直接ハードウェア出力）
+      // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.038）
+      const livingRatio = 0.038;
+      return Math.max(0, Math.min(1, this.volume * livingRatio));
     }
 
     loadRhythmBuffer(trackKey) {
@@ -519,7 +526,7 @@
       if (!this.loadingBuffers) this.loadingBuffers = {};
       if (this.audioBuffers[trackKey] || this.loadingBuffers[trackKey]) return;
       this.loadingBuffers[trackKey] = true;
-      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '37';
+      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '46';
       const src = `assets/sounds/${trackKey}.mp3?v=${v}`;
       fetch(src)
         .then(res => {
@@ -530,6 +537,11 @@
         .then(decoded => {
           this.audioBuffers[trackKey] = decoded;
           delete this.loadingBuffers[trackKey];
+          // HTML5 Audioフォールバック中にバッファが準備できた場合、即座にシームレス移行
+          if (this.currentBgmKey === trackKey && !this.rhythmBufferSource && this.playerA && !this.playerA.paused) {
+            const curPos = this.playerA.currentTime || 0;
+            this.playBgmFile(trackKey, true, curPos, true);
+          }
         })
         .catch(() => {
           delete this.loadingBuffers[trackKey];
@@ -752,7 +764,7 @@
     syncBgmVolume() {
       const targetVol = this.getTargetBgmVolume();
       if (this.rhythmBufferGain && this.ctx) {
-        this.rhythmBufferGain.gain.setValueAtTime(targetVol, this.ctx.currentTime);
+        this.rhythmBufferGain.gain.setValueAtTime(this.bgmMuted ? 0 : targetVol, this.ctx.currentTime);
       }
       if (!this.crossfading) {
         if (this.playerA && this.activeSlot === 'a') this.playerA.volume = targetVol;
@@ -774,14 +786,24 @@
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.value = this.muted ? 0 : this.volume;
 
-          // Connect Oscilloscope Analyser in line with master gain
+          // Dedicated master safety limiter: prevents SE + BGM sum from exceeding 0dBFS
+          // and stops Windows Audio Engine / WASAPI shared mode limiter pumping!
+          this.limiter = this.ctx.createDynamicsCompressor();
+          this.limiter.threshold.setValueAtTime(-1.5, this.ctx.currentTime);
+          this.limiter.knee.setValueAtTime(4.0, this.ctx.currentTime);
+          this.limiter.ratio.setValueAtTime(12.0, this.ctx.currentTime);
+          this.limiter.attack.setValueAtTime(0.002, this.ctx.currentTime);
+          this.limiter.release.setValueAtTime(0.08, this.ctx.currentTime);
+
+          // Connect Oscilloscope Analyser in line with limiter and master gain
           this.analyser = this.ctx.createAnalyser();
           this.analyser.fftSize = 256;
           this.analyser.smoothingTimeConstant = 0.72;
           this.timeData = new Uint8Array(this.analyser.fftSize);
           this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
 
-          this.analyser.connect(this.masterGain);
+          this.analyser.connect(this.limiter);
+          this.limiter.connect(this.masterGain);
           this.masterGain.connect(this.ctx.destination);
 
           // Pre-build short white-noise buffer for Rimshot / K-Snare percussion
@@ -905,7 +927,7 @@
       osc.type = 'sine';
       osc.frequency.setValueAtTime(587.33, now);
       osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.setValueAtTime(0.12, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
       osc.connect(gain);
       gain.connect(this.dest);
@@ -957,7 +979,7 @@
       osc.frequency.setValueAtTime(startF, now);
       osc.frequency.exponentialRampToValueAtTime(peakF, now + 0.045);
       osc.frequency.exponentialRampToValueAtTime(endF, now + 0.12);
-      gain.gain.setValueAtTime(0.40, now);
+      gain.gain.setValueAtTime(0.18, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.135);
       osc.connect(gain);
       gain.connect(this.dest);
@@ -978,7 +1000,7 @@
           else filter.Q.value = 2.2;
         }
         const nGain = this.ctx.createGain();
-        nGain.gain.setValueAtTime(0.32, now);
+        nGain.gain.setValueAtTime(0.15, now);
         nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.115);
         noise.connect(filter);
         filter.connect(nGain);
@@ -993,7 +1015,7 @@
       sub.type = 'sine';
       sub.frequency.setValueAtTime(170 * pitchMult, now);
       sub.frequency.exponentialRampToValueAtTime(42 * pitchMult, now + 0.06);
-      sGain.gain.setValueAtTime(0.28, now);
+      sGain.gain.setValueAtTime(0.14, now);
       sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
       sub.connect(sGain);
       sGain.connect(this.dest);
@@ -1408,7 +1430,7 @@
       zap.type = 'sawtooth';
       zap.frequency.setValueAtTime(2600 * pitchMult, now);
       zap.frequency.exponentialRampToValueAtTime(380 * pitchMult, now + 0.055);
-      zGain.gain.setValueAtTime(0.44, now);
+      zGain.gain.setValueAtTime(0.16, now);
       zGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
       zap.connect(zGain);
       zGain.connect(this.dest);
@@ -1421,7 +1443,7 @@
       rim.type = 'triangle';
       rim.frequency.setValueAtTime(560 * pitchMult, now);
       rim.frequency.exponentialRampToValueAtTime(180 * pitchMult, now + 0.05);
-      rGain.gain.setValueAtTime(0.38, now);
+      rGain.gain.setValueAtTime(0.14, now);
       rGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
       rim.connect(rGain);
       rGain.connect(this.dest);
@@ -1440,7 +1462,7 @@
           else filter.Q.value = 2.0;
         }
         const nGain = this.ctx.createGain();
-        nGain.gain.setValueAtTime(0.40, now);
+        nGain.gain.setValueAtTime(0.15, now);
         nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
         noise.connect(filter);
         filter.connect(nGain);
@@ -1459,7 +1481,7 @@
         chime.type = 'sine';
         chime.frequency.setValueAtTime(noteFreq, now);
         chime.frequency.exponentialRampToValueAtTime(noteFreq * 1.5, now + 0.07);
-        cGain.gain.setValueAtTime(0.24, now);
+        cGain.gain.setValueAtTime(0.10, now);
         cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         chime.connect(cGain);
         cGain.connect(this.dest);
@@ -1477,7 +1499,7 @@
       const freq = Math.min(1300, 820 + (queueIndex - 1) * 55);
       osc.frequency.setValueAtTime(freq, now);
       osc.frequency.exponentialRampToValueAtTime(360, now + 0.022);
-      gain.gain.setValueAtTime(0.11, now);
+      gain.gain.setValueAtTime(0.08, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.026);
       osc.connect(gain);
       gain.connect(this.dest);
