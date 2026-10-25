@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '37';
+  const ASSET_VERSION = '38';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -2618,9 +2618,7 @@
     if (roomType === 'rhythm') {
       const quarterBeatInterval = getRhythmBeatInterval();
       const subBeatInterval = quarterBeatInterval * 0.5;
-      const isCorner = currentBeatIndex % 2 === 0;
-      const timeSinceDownbeat = (isCorner ? 0 : subBeatInterval) + rhythmTimer;
-      const msSinceBeat = Math.round(timeSinceDownbeat * 1000);
+      const msSinceStep = Math.round(rhythmTimer * 1000);
 
       const lastRef =
         rhythmTapQueue.length > 0
@@ -2631,10 +2629,10 @@
 
       if (dist(lastRef.x, lastRef.y, tx, ty) < 5) return;
 
-      // 予約キュー方式統一（Justbeat廃止）:
-      // ・ビート直後100ms以内(msSinceBeat <= 100)かつこの拍で未ダッシュ・キュー空なら、その拍のダッシュとして発動
-      // ・ビート直後101ms以降(msSinceBeat >= 101)は、次の拍まで待ってからダッシュする予約キューへ格納
-      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
+      // 予約キュー方式（表拍・裏拍どちらでもダッシュ可能）:
+      // ・ステップ（表拍または裏拍）直後85ms以内かつこの拍で未ダッシュ・キュー空なら即座にダッシュ発動
+      // ・それ以外は次の拍（表拍または裏拍）で発動するよう予約キューへ格納
+      if (msSinceStep <= 85 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
         executeDashTo(tx, ty);
         beatDashedBeatIndex = currentBeatIndex;
         sound.playQueueTap(1);
@@ -3636,15 +3634,13 @@
           const isCorner = currentBeatIndex % 2 === 0;
           rhythmBeatPulse = isCorner ? 1.0 : 0.55;
 
-          // Corner downbeats (表拍: 1, 2, 3, 4拍目) trigger queued dashes!
-          if (isCorner) {
-            if (rhythmTapQueue.length > 0) {
-              const nextTap = rhythmTapQueue.shift();
-              executeDashTo(nextTap.x, nextTap.y);
-              beatDashedBeatIndex = currentBeatIndex;
-            } else {
-              beatDashedBeatIndex = -1;
-            }
+          // 表拍(角)・裏拍(辺)のどちらでもダッシュ可能！
+          if (rhythmTapQueue.length > 0) {
+            const nextTap = rhythmTapQueue.shift();
+            executeDashTo(nextTap.x, nextTap.y);
+            beatDashedBeatIndex = currentBeatIndex;
+          } else {
+            beatDashedBeatIndex = -1;
           }
         }
         rhythmTimer = targetFrac * subBeatInterval;
@@ -3654,17 +3650,16 @@
           rhythmTimer -= subBeatInterval;
           currentBeatIndex = (currentBeatIndex + 1) % RHYTHM_BEATS;
           const isCorner = currentBeatIndex % 2 === 0;
-          rhythmBeatPulse = isCorner ? 1.0 : 0.55;
+          rhythmBeatPulse = isCorner ? 1.0 : 0.65;
           sound.playRhythmBeat(currentBeatIndex, rhythmTrackIndex);
 
-          if (isCorner) {
-            if (rhythmTapQueue.length > 0) {
-              const nextTap = rhythmTapQueue.shift();
-              executeDashTo(nextTap.x, nextTap.y);
-              beatDashedBeatIndex = currentBeatIndex;
-            } else {
-              beatDashedBeatIndex = -1;
-            }
+          // 表拍(角)・裏拍(辺)のどちらでもダッシュ可能！
+          if (rhythmTapQueue.length > 0) {
+            const nextTap = rhythmTapQueue.shift();
+            executeDashTo(nextTap.x, nextTap.y);
+            beatDashedBeatIndex = currentBeatIndex;
+          } else {
+            beatDashedBeatIndex = -1;
           }
         }
       }
@@ -4378,7 +4373,7 @@
     ctx.font = `800 12px ${POP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const badgeText = '🛠️ 拍確認デバッグモード (敵なし・無敵)';
+    const badgeText = '🛠️ リズム検証モード (表・裏拍ダッシュ可・敵なし)';
     const textWidth = ctx.measureText(badgeText).width;
     const badgeW = textWidth + 18;
     const badgeH = 22;
