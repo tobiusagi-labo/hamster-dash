@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '40';
+  const ASSET_VERSION = '41';
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -509,7 +509,7 @@
     getTargetBgmVolume() {
       if (this.bgmMuted) return 0;
       const isRhythm = this.currentBgmKey && this.currentBgmKey.startsWith('rhythm_');
-      const baseRatio = isRhythm ? 0.22 : 0.35; // BGM音量を心地よく聞き取りやすいバランスに調整 (リズム: 0.22, リビング: 0.35)
+      const baseRatio = isRhythm ? 0.55 : 0.38; // リズムモードのBGM音量をしっかり聴こえる音圧に調整 (リズム: 0.55, リビング: 0.38)
       return Math.max(0, Math.min(1, this.volume * baseRatio));
     }
 
@@ -1666,7 +1666,6 @@
 
   // 8-Beat Rhythm Room State (5 selectable tracks, BPM 160~180)
   const RHYTHM_BEATS = 8;
-  const RHYTHM_AUDIO_LATENCY_COMPENSATION = 0.048; // 48ms forward compensation for audio buffer queue, speaker output latency & 60fps frame quantization
   let rhythmTrackIndex = 0;
   let hamsterTapPulseTimer = 0;
   let previewTimeouts = [];
@@ -2622,9 +2621,23 @@
     if (roomType === 'rhythm') {
       const quarterBeatInterval = getRhythmBeatInterval();
       const subBeatInterval = quarterBeatInterval * 0.5;
-      const isCorner = currentBeatIndex % 2 === 0;
-      const timeSinceDownbeat = (isCorner ? 0 : subBeatInterval) + rhythmTimer;
-      const msSinceBeat = Math.round(timeSinceDownbeat * 1000);
+
+      const userOffsetSec = (sound.timingOffsetMs || 0) * 0.001;
+      let beatsFloat = 0;
+      if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
+        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + userOffsetSec);
+        beatsFloat = curAudTime / quarterBeatInterval;
+      } else {
+        const frac = rhythmTimer / subBeatInterval;
+        const continuousStep = currentBeatIndex + frac;
+        beatsFloat = continuousStep * 0.5;
+      }
+
+      // 最寄りの四隅表拍（0, 1, 2, 3拍目）との差分をミリ秒単位で算出
+      const nearestBeat = Math.round(beatsFloat);
+      const diffSec = beatsFloat - nearestBeat; // [-0.5, +0.5] (負: 拍より手前、正: 拍の直後)
+      const diffMs = diffSec * quarterBeatInterval * 1000;
+      const nearestBeatIndex = ((nearestBeat * 2) % RHYTHM_BEATS + RHYTHM_BEATS) % RHYTHM_BEATS;
 
       const lastRef =
         rhythmTapQueue.length > 0
@@ -2635,12 +2648,13 @@
 
       if (dist(lastRef.x, lastRef.y, tx, ty) < 5) return;
 
-      // 予約キュー方式（4拍移動: 四隅の表拍のみでダッシュ発動）:
-      // ・表拍直後100ms以内(msSinceBeat <= 100)かつこの拍で未ダッシュ・キュー空なら、その拍のダッシュとして発動
-      // ・表拍直後101ms以降(msSinceBeat >= 101)は、次の表拍まで待ってからダッシュする予約キューへ格納
-      if (msSinceBeat <= 100 && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== currentBeatIndex && !player.isDashing) {
+      // ジャスト判定ウィンドウ: ±110ms 以内（手前110ms〜後ろ110msの対称ウィンドウ）
+      // キューが空かつこの拍で未ダッシュなら、その拍のダッシュとして「即座に発動」！
+      // （※前のダッシュの途中であっても、ジャストタップなら直ちに新しい目的地へ即時ダッシュ開始）
+      const isJustTiming = Math.abs(diffMs) <= 110;
+      if (isJustTiming && rhythmTapQueue.length === 0 && beatDashedBeatIndex !== nearestBeatIndex) {
         executeDashTo(tx, ty);
-        beatDashedBeatIndex = currentBeatIndex;
+        beatDashedBeatIndex = nearestBeatIndex;
         sound.playQueueTap(1);
       } else {
         rhythmTapQueue.push({ x: tx, y: ty });
@@ -3627,7 +3641,7 @@
 
       if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
         const userOffsetSec = (sound.timingOffsetMs || 0) * 0.001;
-        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + RHYTHM_AUDIO_LATENCY_COMPENSATION + userOffsetSec);
+        const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + userOffsetSec);
         const totalSteps = (curAudTime / quarterBeatInterval) * 2;
         const targetStep = Math.floor(totalSteps) % RHYTHM_BEATS;
         const targetFrac = totalSteps % 1.0;
@@ -4382,7 +4396,7 @@
       currentContinuousStep = ((beatsElapsed * 2) % 8);
     } else if (sound.rhythmBufferSource && sound.ctx && state === 'PLAYING') {
       const userOffsetSec = (sound.timingOffsetMs || 0) * 0.001;
-      const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + RHYTHM_AUDIO_LATENCY_COMPENSATION + userOffsetSec);
+      const curAudTime = Math.max(0, sound.ctx.currentTime - sound.rhythmStartTime + userOffsetSec);
       const totalSteps = (curAudTime / quarterBeatInterval) * 2;
       currentContinuousStep = ((totalSteps % 8) + 8) % 8;
     } else {
