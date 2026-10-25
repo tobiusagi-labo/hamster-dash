@@ -22,6 +22,8 @@
   const timeTextEl = document.getElementById('time-text');
   const timerBarFill = document.getElementById('timer-bar-fill');
 
+  let titleEnterTime = performance.now();
+
   const titleScreen = document.getElementById('title-screen');
   const modeSelectScreen = document.getElementById('mode-select-screen');
   const howtoModal = document.getElementById('howto-modal');
@@ -119,7 +121,7 @@
     }
 
     initImageLoaders() {
-      const v = '31';
+      const v = '32';
       const imageFiles = {
         player: `assets/images/player.png?v=${v}`,
         player_helmet: `assets/images/player_helmet.png?v=${v}`,
@@ -150,7 +152,7 @@
         const img = new Image();
         img.onload = () => {
           this.images[key] = img;
-          if (key === 'title_mascot' && typeof titleEnterTime !== 'undefined') {
+          if (key === 'title_mascot') {
             titleEnterTime = performance.now();
           }
         };
@@ -162,7 +164,7 @@
     }
 
     initSoundLoaders() {
-      const v = '31';
+      const v = '32';
       const soundFiles = {
         living_bgm: `assets/sounds/living_bgm.mp3?v=${v}`,
         living_bgm2: `assets/sounds/living_bgm2.mp3?v=${v}`,
@@ -1567,7 +1569,6 @@
   let deathCause = 'roomba'; // 'roomba' | 'yarn' | 'patrol' | 'starve' | 'clear'
   let screenShake = 0;
   let crashEffect = null;
-  let titleEnterTime = performance.now();
 
   // Timer Item & Slow-Motion Effect State
   let timerItems = [];
@@ -2543,7 +2544,9 @@
   });
 
   // Step 1 Title Screen -> Tap anywhere -> Step 2 Mode Select Hub
-  titleScreen.addEventListener('click', () => {
+  function handleTitleTap(e) {
+    if (state !== 'TITLE') return;
+    if (e && e.cancelable) e.preventDefault();
     sound.init();
     sound.playUIClick();
     state = 'MODESELECT';
@@ -2562,7 +2565,10 @@
       sound.playRhythmBeat(0, rhythmTrackIndex);
     }
     syncRoomBgm();
-  });
+  }
+
+  titleScreen.addEventListener('click', handleTitleTap);
+  titleScreen.addEventListener('pointerdown', handleTitleTap);
 
   // Step 2 Mode Select Hub -> Tap outside .hub-card -> Return to Step 1 Title Screen!
   modeSelectScreen.addEventListener('click', (e) => {
