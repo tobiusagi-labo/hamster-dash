@@ -8,6 +8,35 @@
 
   // --- DOM Elements ---
   const ASSET_VERSION = '51';
+  const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+  let debugProfile = {
+    bg: 0,
+    items: 0,
+    hamster: 0,
+    obstacles: 0,
+    effects: 0,
+    osc: 0,
+    totalRender: 0,
+    fps: 60,
+    lastFpsUpdate: 0,
+    frameCount: 0,
+  };
+  const RHYTHM_TAP_QUEUE_MAX = 8;
+  const COLLISION_NONE = 'none';
+  const COLLISION_BOUNCE = 'bounce';
+  const COLLISION_GAMEOVER = 'gameover';
+
+  // --- Game Physics & Gameplay Constants (C-4) ---
+  const BOUNCE_SPEED = 620;
+  const SLIDE_SPEED_ICE = 540;
+  const SLIDE_SPEED_DEFAULT = 300;
+  const CAT_PAW_THRUST_SPEED = 780;
+  const CAT_PAW_HOLD_DURATION = 0.45;
+  const CAT_PAW_RETRACT_SPEED = 520;
+  const CAT_PAW_DEFAULT_INTERVAL = 3.5;
+  const HELMET_INVULN_DURATION = 0.65;
+  const SURVIVAL_MAX_TIME = 16.0;
+  const TIMEATTACK_MAX_TIME = 60.0;
   const gameContainer = document.getElementById('game-container');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -180,7 +209,7 @@
 
       for (const [key, src] of Object.entries(soundFiles)) {
         const aud = new Audio();
-        aud.volume = 0.038;
+        aud.volume = 1;
         // living_bgm, living_bgm2 are preloaded for immediate readiness; rhythm tracks load into Web Audio buffer
         aud.preload = key.startsWith('living_bgm') ? 'auto' : 'none';
         aud.src = src;
@@ -517,10 +546,41 @@
         // リズムゲームとしてノリ良くしっかり聴こえる明瞭な音量（0.65）
         return 0.65;
       }
-      // リビングのHTML5 Audio経由（直接ハードウェア出力）
+      // リビングのHTML5 Audio経由（Web Audio GainNode -> dest -> limiter -> masterGain: volume適用）
       // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.038）
-      const livingRatio = 0.038;
-      return Math.max(0, Math.min(1, this.volume * livingRatio));
+      return 0.038;
+    }
+
+    getMediaElementGain(audioElement) {
+      if (!audioElement) return null;
+      if (!this.ctx) this.init();
+      if (!this.ctx) return null;
+      if (!this.mediaSources) this.mediaSources = new WeakMap();
+      let nodeData = this.mediaSources.get(audioElement);
+      if (!nodeData) {
+        try {
+          const source = this.ctx.createMediaElementSource(audioElement);
+          const gain = this.ctx.createGain();
+          source.connect(gain);
+          gain.connect(this.dest);
+          nodeData = { source, gain };
+          this.mediaSources.set(audioElement, nodeData);
+        } catch (e) {
+          return null;
+        }
+      }
+      return nodeData ? nodeData.gain : null;
+    }
+
+    setPlayerVolume(player, vol) {
+      if (!player) return;
+      player.volume = 1;
+      const gain = this.getMediaElementGain(player);
+      if (gain && this.ctx) {
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+      } else {
+        player.volume = Math.max(0, Math.min(1, vol * this.volume));
+      }
     }
 
     loadRhythmBuffer(trackKey, onLoaded) {
@@ -537,7 +597,7 @@
       if (this.loadingBuffers && this.loadingBuffers[trackKey]) return;
       if (!this.loadingBuffers) this.loadingBuffers = {};
       this.loadingBuffers[trackKey] = true;
-      const v = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '48';
+      const v = ASSET_VERSION;
       const src = `assets/sounds/${trackKey}.mp3?v=${v}`;
       fetch(src)
         .then(res => {
@@ -651,8 +711,8 @@
       }
 
       const targetVol = this.getTargetBgmVolume();
-      this.playerA.volume = targetVol;
-      this.playerB.volume = 0;
+      this.setPlayerVolume(this.playerA, targetVol);
+      this.setPlayerVolume(this.playerB, 0);
       try {
         this.playerA.currentTime = Math.max(0, startOffset);
         const p = this.playerA.play();
@@ -689,8 +749,8 @@
           const targetVol = this.getTargetBgmVolume();
           const p = Math.max(0, Math.min(1, this.crossfadeProgress));
 
-          active.volume = Math.max(0, Math.min(1, targetVol * (1 - p)));
-          standby.volume = Math.max(0, Math.min(1, targetVol * p));
+          this.setPlayerVolume(active, targetVol * (1 - p));
+          this.setPlayerVolume(standby, targetVol * p);
 
           if (p >= 1.0 || active.ended) {
             try {
@@ -699,7 +759,7 @@
             } catch (_) {}
             this.activeSlot = this.activeSlot === 'a' ? 'b' : 'a';
             this.currentBgmAudio = standby;
-            standby.volume = Math.max(0, Math.min(1, targetVol));
+            this.setPlayerVolume(standby, targetVol);
             this.crossfading = false;
             this.crossfadeProgress = 0;
           }
@@ -814,14 +874,14 @@
         this.rhythmBufferGain.gain.setValueAtTime(this.bgmMuted ? 0 : targetVol, this.ctx.currentTime);
       }
       if (!this.crossfading) {
-        if (this.playerA && this.activeSlot === 'a') this.playerA.volume = targetVol;
-        if (this.playerB && this.activeSlot === 'b') this.playerB.volume = targetVol;
+        if (this.playerA && this.activeSlot === 'a') this.setPlayerVolume(this.playerA, targetVol);
+        if (this.playerB && this.activeSlot === 'b') this.setPlayerVolume(this.playerB, targetVol);
       } else {
         const p = Math.max(0, Math.min(1, this.crossfadeProgress));
         const active = this.activeSlot === 'a' ? this.playerA : this.playerB;
         const standby = this.activeSlot === 'a' ? this.playerB : this.playerA;
-        if (active) active.volume = targetVol * (1 - p);
-        if (standby) standby.volume = targetVol * p;
+        if (active) this.setPlayerVolume(active, targetVol * (1 - p));
+        if (standby) this.setPlayerVolume(standby, targetVol * p);
       }
     }
 
@@ -866,8 +926,8 @@
           this.preloadAllRhythmBuffers();
         }
       }
-      if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume();
+      if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
+        this.ctx.resume().catch(() => {});
       }
     }
 
@@ -1569,7 +1629,8 @@
 
   function getBestScore(mode) {
     try {
-      return parseInt(localStorage.getItem(STORAGE_KEYS[mode]) || '0', 10);
+      const parsed = parseInt(localStorage.getItem(STORAGE_KEYS[mode]) || '0', 10);
+      return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
     } catch {
       return 0;
     }
@@ -1670,19 +1731,34 @@
       starve: '⏳',
     };
 
+    function escapeHtml(str) {
+      if (typeof str !== 'string') return String(str);
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     historyListEl.innerHTML = stats.history
       .map((item) => {
-        const modeLabel = item.mode === 'survival' ? '🔥サバイバル' : '⏱️60秒';
+        const safeMode = item.mode === 'survival' ? 'survival' : 'timeattack';
+        const modeLabel = safeMode === 'survival' ? '🔥サバイバル' : '⏱️60秒';
         const icon = causeIconMap[item.cause] || '💥';
+        const safeFoods = escapeHtml(Number(item.foods) || 0);
+        const safeCombo = escapeHtml(Number(item.combo) || 0);
+        const safeTime = escapeHtml(typeof item.time === 'number' ? item.time.toFixed(1) : String(item.time || '0'));
+        const safeScore = escapeHtml(Number(item.score || 0).toLocaleString());
         return `
           <div class="history-row">
             <div class="history-left">
               <span>${icon}</span>
-              <span class="history-mode-tag ${item.mode}">${modeLabel}</span>
+              <span class="history-mode-tag ${safeMode}">${modeLabel}</span>
             </div>
             <div class="history-right">
-              <span class="history-meta">🌻${item.foods} / ${item.combo}連 / ${item.time}s</span>
-              <span class="history-score">${Number(item.score).toLocaleString()}点</span>
+              <span class="history-meta">🌻${safeFoods} / ${safeCombo}連 / ${safeTime}s</span>
+              <span class="history-score">${safeScore}点</span>
             </div>
           </div>
         `;
@@ -1704,6 +1780,7 @@
   // 'TITLE' | 'MODESELECT' | 'COUNTDOWN' | 'PLAYING' | 'DYING' | 'GAMEOVER'
   let state = 'TITLE';
   let isPaused = false;
+  let hasWarnedPlayerNaN = false;
   let gameMode = 'survival'; // 'survival' | 'timeattack'
   let roomType = 'living'; // 'living' (LIVINGROOM) | 'rhythm' (RHYTHMROOM)
 
@@ -1746,10 +1823,10 @@
     width: 70, // thickness of paw
     timer: 0,
     warnDuration: 0.65,
-    thrustSpeed: 780,
-    holdDuration: 0.45,
-    retractSpeed: 520,
-    nextSpawnTimer: 3.5,
+    thrustSpeed: CAT_PAW_THRUST_SPEED,
+    holdDuration: CAT_PAW_HOLD_DURATION,
+    retractSpeed: CAT_PAW_RETRACT_SPEED,
+    nextSpawnTimer: CAT_PAW_DEFAULT_INTERVAL,
   };
 
   // 8-Beat Rhythm Room State (5 selectable tracks, BPM 160~180)
@@ -2187,7 +2264,7 @@
   // Helmet Obstacle Bounce -> Repels player & obstacle + displays "ズギャーン！！"
   function triggerHelmetBounce(hitObs) {
     player.hasHelmet = false;
-    player.helmetInvulnTimer = 0.65;
+    player.helmetInvulnTimer = HELMET_INVULN_DURATION;
     player.isDashing = false;
     rhythmTapQueue = [];
     beatDashedBeatIndex = -1;
@@ -2223,7 +2300,7 @@
     );
 
     // Strong bounce velocity on player
-    const bounceSpeed = 620;
+    const bounceSpeed = BOUNCE_SPEED;
     player.vx = Math.cos(bounceAng) * bounceSpeed;
     player.vy = Math.sin(bounceAng) * bounceSpeed;
     player.angle = bounceAng;
@@ -2418,13 +2495,8 @@
     }
   }
 
-  // --- Start / Reset Game ---
-  function startGame(mode) {
-    sound.init();
-    clearTrackPreview();
-    sound.playUIClick();
-    gameMode = mode;
-    state = 'COUNTDOWN';
+  // --- Reset Run State (C-1) ---
+  function resetRunState(mode) {
     countdownTimer = 4.0;
     lastCountdownBeep = 5;
     startBannerTimer = 0;
@@ -2438,14 +2510,6 @@
 
     livingBgmTimer = 0;
     livingBgmStep = 0;
-
-    if (roomType === 'rhythm') {
-      sound.stopBgmFile();
-      const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
-      sound.loadRhythmBuffer(trackKey);
-    } else {
-      syncRoomBgm(true);
-    }
 
     score = 0;
     combo = 0;
@@ -2479,16 +2543,12 @@
     catPaw.timer = 0;
     catPaw.nextSpawnTimer = randRange(2.5, 4.5);
 
-    if (gameMode === 'survival') {
-      maxTime = 16.0;
-      timeLeft = 16.0;
-      hud.classList.add('mode-survival');
-      hud.classList.remove('mode-timeattack');
+    if (mode === 'survival') {
+      maxTime = SURVIVAL_MAX_TIME;
+      timeLeft = SURVIVAL_MAX_TIME;
     } else {
-      maxTime = 60.0;
-      timeLeft = 60.0;
-      hud.classList.add('mode-timeattack');
-      hud.classList.remove('mode-survival');
+      maxTime = TIMEATTACK_MAX_TIME;
+      timeLeft = TIMEATTACK_MAX_TIME;
     }
 
     player.x = width / 2;
@@ -2536,6 +2596,33 @@
     spawnFood(FOOD_TYPES[0]);
     spawnFood(FOOD_TYPES[0]);
     spawnFood(FOOD_TYPES[1]);
+  }
+
+  // --- Start / Reset Game ---
+  function startGame(mode) {
+    sound.init();
+    clearTrackPreview();
+    sound.playUIClick();
+    gameMode = mode;
+    state = 'COUNTDOWN';
+
+    resetRunState(mode);
+
+    if (roomType === 'rhythm') {
+      sound.stopBgmFile();
+      const trackKey = `rhythm_${(rhythmTrackIndex % RHYTHM_TRACKS.length) + 1}`;
+      sound.loadRhythmBuffer(trackKey);
+    } else {
+      syncRoomBgm(true);
+    }
+
+    if (gameMode === 'survival') {
+      hud.classList.add('mode-survival');
+      hud.classList.remove('mode-timeattack');
+    } else {
+      hud.classList.add('mode-timeattack');
+      hud.classList.remove('mode-survival');
+    }
 
     titleScreen.classList.add('hidden');
     modeSelectScreen.classList.add('hidden');
@@ -2753,8 +2840,11 @@
         beatDashedBeatIndex = nearestBeatIndex;
         sound.playQueueTap(1);
       } else {
+        if (rhythmTapQueue.length >= RHYTHM_TAP_QUEUE_MAX) {
+          rhythmTapQueue.shift();
+        }
         rhythmTapQueue.push({ x: tx, y: ty });
-        sound.playQueueTap(rhythmTapQueue.length);
+        sound.playQueueTap(Math.min(rhythmTapQueue.length, RHYTHM_TAP_QUEUE_MAX));
       }
     } else {
       // LIVING ROOM: Immediate high-speed linear dash
@@ -2769,10 +2859,10 @@
     'touchstart',
     (e) => {
       e.preventDefault();
-      if (e.touches && e.touches.length > 0) {
+      const touch = (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0] : (e.touches && e.touches[0]);
+      if (touch) {
         lastCanvasTouchTime = Date.now();
-        const t = e.touches[0];
-        handleTap(t.clientX, t.clientY);
+        handleTap(touch.clientX, touch.clientY);
       }
     },
     { passive: false }
@@ -2864,15 +2954,20 @@
 
   let pauseOpenedTime = 0;
 
-  function openPauseMenu() {
+  function pauseGameInternal(playClick = false) {
     if (state === 'GAMEOVER' || state === 'TITLE' || state === 'MODESELECT') return;
+    if (isPaused) return;
     sound.init();
-    sound.playUIClick();
+    if (playClick) sound.playUIClick();
     isPaused = true;
     sound.pauseBgm();
     pauseOpenedTime = Date.now();
     sound.syncVolumeUI();
     if (pauseModal) pauseModal.classList.remove('hidden');
+  }
+
+  function openPauseMenu() {
+    pauseGameInternal(true);
   }
 
   function closePauseMenu() {
@@ -2954,6 +3049,38 @@
       sound.setVolume(val);
     });
   }
+
+  // Background auto-pause & AudioContext resume handling (A-1)
+  let bgPausedForVisibility = false;
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      if ((state === 'PLAYING' || state === 'COUNTDOWN') && !isPaused) {
+        pauseGameInternal(false);
+      } else if (state === 'TITLE' || state === 'MODESELECT') {
+        sound.pauseBgm();
+        bgPausedForVisibility = true;
+      }
+    } else {
+      if (sound.ctx && (sound.ctx.state === 'suspended' || sound.ctx.state === 'interrupted')) {
+        sound.ctx.resume().catch(() => {});
+      }
+      if (bgPausedForVisibility) {
+        bgPausedForVisibility = false;
+        if (state === 'TITLE' || state === 'MODESELECT') {
+          sound.resumeBgm();
+        }
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('pagehide', () => {
+    if ((state === 'PLAYING' || state === 'COUNTDOWN') && !isPaused) {
+      pauseGameInternal(false);
+    } else if (state === 'TITLE' || state === 'MODESELECT') {
+      sound.pauseBgm();
+      bgPausedForVisibility = true;
+    }
+  });
 
   // Mode Select Direct Click Listeners
   if (btnSurvival) {
@@ -3849,6 +3976,15 @@
 
     // Ensure player coordinates are always valid numbers
     if (isNaN(player.x) || isNaN(player.y) || isNaN(player.vx) || isNaN(player.vy)) {
+      if (!hasWarnedPlayerNaN) {
+        hasWarnedPlayerNaN = true;
+        console.warn('Player coordinate NaN guard triggered! Recovering to safe center.', {
+          x: player.x,
+          y: player.y,
+          vx: player.vx,
+          vy: player.vy,
+        });
+      }
       player.x = width / 2;
       player.y = HUD_TOP_MARGIN + (height - HUD_TOP_MARGIN) * 0.65;
       player.vx = 0;
@@ -4104,13 +4240,16 @@
 
         checkPlayerFoodAndItemCollection();
 
-        if (checkAllCollisions()) {
+        const colRes = checkAllCollisions();
+        if (colRes === COLLISION_GAMEOVER) {
           return;
+        } else if (colRes === COLLISION_BOUNCE) {
+          break;
         }
       }
 
-      if (remDist <= stepDist) {
-        const baseSlideSpeed = (roomType === 'living' && livingOption === 'ice') ? 540 : 300;
+      if (player.isDashing && remDist <= stepDist) {
+        const baseSlideSpeed = (roomType === 'living' && livingOption === 'ice') ? SLIDE_SPEED_ICE : SLIDE_SPEED_DEFAULT;
         const slideInitialSpeed = baseSlideSpeed * playerSpeedMultiplier;
         player.vx = ux * slideInitialSpeed;
         player.vy = uy * slideInitialSpeed;
@@ -4161,7 +4300,8 @@
       }
 
       checkPlayerFoodAndItemCollection();
-      if (checkAllCollisions()) {
+      const colRes = checkAllCollisions();
+      if (colRes === COLLISION_GAMEOVER) {
         return;
       }
     }
@@ -4352,7 +4492,7 @@
 
   function checkAllCollisions() {
     if (player.helmetInvulnTimer > 0) {
-      return false;
+      return COLLISION_NONE;
     }
 
     // Cat Paw Collision (Cat+)
@@ -4369,10 +4509,10 @@
         if (player.hasHelmet) {
           triggerHelmetBounce(pawCenter);
           catPaw.state = 'retract';
-          return true;
+          return COLLISION_BOUNCE;
         }
         triggerCrashGameOver(pawCenter, '🐾 飛び出してきた猫の手に捕まった！', 'cat');
-        return true;
+        return COLLISION_GAMEOVER;
       }
     }
 
@@ -4381,11 +4521,11 @@
       if (d < player.radius + vacuum.hitRadius) {
         if (player.hasHelmet) {
           triggerHelmetBounce(vacuum);
-          return true;
+          return COLLISION_BOUNCE;
         }
         vacuum.hitHighlight = true;
         triggerCrashGameOver(vacuum, '💥 お掃除ロボに激突！', 'roomba');
-        return true;
+        return COLLISION_GAMEOVER;
       }
     }
 
@@ -4395,17 +4535,17 @@
       if (d < player.radius + obs.hitRadius) {
         if (player.hasHelmet) {
           triggerHelmetBounce(obs);
-          return true;
+          return COLLISION_BOUNCE;
         }
         obs.hitHighlight = true;
         const reason =
           obs.kind === 'yarn' ? '💥 転がる毛糸玉に激突！' : '💥 ネコのおもちゃに激突！';
         triggerCrashGameOver(obs, reason, obs.kind);
-        return true;
+        return COLLISION_GAMEOVER;
       }
     }
 
-    return false;
+    return COLLISION_NONE;
   }
 
   // --- Rendering ---
@@ -4619,21 +4759,42 @@
     ctx.restore();
   }
 
-  function drawBackground() {
-    if (roomType === 'rhythm') {
-      // Dark Nightclub / DJ Dancefloor Background for RHYTHM ROOM
-      ctx.fillStyle = '#090414';
-      ctx.fillRect(-20, -20, width + 40, height + 40);
+  let bgCacheCanvas = null;
+  let bgCacheCtx = null;
+  let bgCacheKey = '';
 
-      // Subtle dark club perspective grid lines
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
-      ctx.lineWidth = 1.5;
+  function getStaticBgCanvas() {
+    const key = width + '_' + height + '_' + roomType + '_' + livingOption;
+    if (bgCacheCanvas && bgCacheKey === key) {
+      return bgCacheCanvas;
+    }
+    if (!bgCacheCanvas) {
+      bgCacheCanvas = document.createElement('canvas');
+      bgCacheCtx = bgCacheCanvas.getContext('2d');
+    }
+    const canvasW = width + 40;
+    const canvasH = height + 40;
+    if (bgCacheCanvas.width !== canvasW || bgCacheCanvas.height !== canvasH) {
+      bgCacheCanvas.width = canvasW;
+      bgCacheCanvas.height = canvasH;
+    }
+
+    const bCtx = bgCacheCtx;
+    bCtx.save();
+    bCtx.translate(20, 20);
+
+    if (roomType === 'rhythm') {
+      bCtx.fillStyle = '#090414';
+      bCtx.fillRect(-20, -20, width + 40, height + 40);
+
+      bCtx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
+      bCtx.lineWidth = 1.5;
       const plankWidth = 48;
       for (let x = plankWidth; x < width; x += plankWidth) {
-        ctx.beginPath();
-        ctx.moveTo(x, -20);
-        ctx.lineTo(x, height + 20);
-        ctx.stroke();
+        bCtx.beginPath();
+        bCtx.moveTo(x, -20);
+        bCtx.lineTo(x, height + 20);
+        bCtx.stroke();
       }
 
       const rx = WALL_PADDING - 8;
@@ -4641,11 +4802,49 @@
       const rw = width - (WALL_PADDING - 8) * 2;
       const rh = height - ry - (WALL_PADDING - 8);
 
-      // Deep dark club stage floor (clean & high-visibility without tile clutter)
-      ctx.fillStyle = '#140b29';
-      roundRect(ctx, rx, ry, rw, rh, 20);
-      ctx.fill();
+      bCtx.fillStyle = '#140b29';
+      roundRect(bCtx, rx, ry, rw, rh, 20);
+      bCtx.fill();
+    } else {
+      const isIce = livingOption === 'ice';
+      bCtx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
+      bCtx.fillRect(-20, -20, width + 40, height + 40);
 
+      bCtx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
+      bCtx.lineWidth = 2;
+      const plankWidth = 48;
+      for (let x = plankWidth; x < width; x += plankWidth) {
+        bCtx.beginPath();
+        bCtx.moveTo(x, -20);
+        bCtx.lineTo(x, height + 20);
+        bCtx.stroke();
+      }
+
+      const rx = WALL_PADDING - 8;
+      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
+      const rw = width - (WALL_PADDING - 8) * 2;
+      const rh = height - ry - (WALL_PADDING - 8);
+
+      bCtx.fillStyle = isIce ? 'rgba(240, 249, 255, 0.75)' : 'rgba(254, 249, 195, 0.65)';
+      roundRect(bCtx, rx, ry, rw, rh, 20);
+      bCtx.fill();
+    }
+
+    bCtx.restore();
+    bgCacheKey = key;
+    return bgCacheCanvas;
+  }
+
+  function drawBackground() {
+    const bgCanvas = getStaticBgCanvas();
+    ctx.drawImage(bgCanvas, -20, -20);
+
+    const rx = WALL_PADDING - 8;
+    const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
+    const rw = width - (WALL_PADDING - 8) * 2;
+    const rh = height - ry - (WALL_PADDING - 8);
+
+    if (roomType === 'rhythm') {
       // Subtle soft ambient spotlight in the center of the club floor
       ctx.save();
       roundRect(ctx, rx + 4, ry + 4, rw - 8, rh - 8, 16);
@@ -4668,29 +4867,6 @@
       // Draw the 8-Beat Perimeter Dots & Orbiting Light
       drawRhythmPerimeter(rx, ry, rw, rh);
     } else {
-      // LIVING ROOM: Warm Wooden Floor OR Clean Simple Ice Blue (Ice+)
-      const isIce = livingOption === 'ice';
-      ctx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
-      ctx.fillRect(-20, -20, width + 40, height + 40);
-
-      ctx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
-      ctx.lineWidth = 2;
-      const plankWidth = 48;
-      for (let x = plankWidth; x < width; x += plankWidth) {
-        ctx.beginPath();
-        ctx.moveTo(x, -20);
-        ctx.lineTo(x, height + 20);
-        ctx.stroke();
-      }
-
-      const rx = WALL_PADDING - 8;
-      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
-      const rw = width - (WALL_PADDING - 8) * 2;
-      const rh = height - ry - (WALL_PADDING - 8);
-
-      ctx.fillStyle = isIce ? 'rgba(240, 249, 255, 0.75)' : 'rgba(254, 249, 195, 0.65)';
-      roundRect(ctx, rx, ry, rw, rh, 20);
-      ctx.fill();
 
       ctx.strokeStyle =
         worldSlowTimer > 0
@@ -8002,6 +8178,7 @@
   }
 
   function render() {
+    const t0 = isDebugMode ? performance.now() : 0;
     ctx.setTransform(dpr * viewScaleX, 0, 0, dpr * viewScaleY, 0, 0);
     ctx.clearRect(-20, -20, width + 40, height + 40);
 
@@ -8012,24 +8189,71 @@
       ctx.translate(sx, sy);
     }
 
+    const tBg0 = isDebugMode ? performance.now() : 0;
     drawBackground();
+    const tBg1 = isDebugMode ? performance.now() : 0;
+
+    const tItems0 = isDebugMode ? performance.now() : 0;
     drawDashTrailsAndRipples();
     drawFoods();
     drawTimerItems();
     drawPoisonItem();
     drawHelmetItem();
+    const tItems1 = isDebugMode ? performance.now() : 0;
 
+    const tHam0 = isDebugMode ? performance.now() : 0;
     for (const img of player.afterimages) {
       drawHamster(img.x, img.y, img.angle, true, img.alpha * 0.55);
     }
-
     drawHamster(player.x, player.y, player.angle, player.isDashing, 1);
+    const tHam1 = isDebugMode ? performance.now() : 0;
+
+    const tObs0 = isDebugMode ? performance.now() : 0;
     drawVacuum();
     drawExtraObstacles();
     drawCatPaw();
+    const tObs1 = isDebugMode ? performance.now() : 0;
+
+    const tEff0 = isDebugMode ? performance.now() : 0;
     drawEffects();
+    const tEff1 = isDebugMode ? performance.now() : 0;
 
     ctx.restore();
+
+    if (isDebugMode) {
+      const t1 = performance.now();
+      debugProfile.bg = debugProfile.bg * 0.9 + (tBg1 - tBg0) * 0.1;
+      debugProfile.items = debugProfile.items * 0.9 + (tItems1 - tItems0) * 0.1;
+      debugProfile.hamster = debugProfile.hamster * 0.9 + (tHam1 - tHam0) * 0.1;
+      debugProfile.obstacles = debugProfile.obstacles * 0.9 + (tObs1 - tObs0) * 0.1;
+      debugProfile.effects = debugProfile.effects * 0.9 + (tEff1 - tEff0) * 0.1;
+      debugProfile.totalRender = debugProfile.totalRender * 0.9 + (t1 - t0) * 0.1;
+
+      debugProfile.frameCount++;
+      if (t1 - debugProfile.lastFpsUpdate >= 500) {
+        debugProfile.fps = Math.round((debugProfile.frameCount * 1000) / (t1 - debugProfile.lastFpsUpdate));
+        debugProfile.frameCount = 0;
+        debugProfile.lastFpsUpdate = t1;
+      }
+
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+      ctx.fillRect(8, 8, 175, 120);
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('FPS: ' + debugProfile.fps + ' | Total: ' + debugProfile.totalRender.toFixed(2) + 'ms', 14, 24);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '10px monospace';
+      ctx.fillText('Background: ' + debugProfile.bg.toFixed(2) + 'ms', 14, 40);
+      ctx.fillText('Items/Trails: ' + debugProfile.items.toFixed(2) + 'ms', 14, 55);
+      ctx.fillText('Hamster: ' + debugProfile.hamster.toFixed(2) + 'ms', 14, 70);
+      ctx.fillText('Obstacles: ' + debugProfile.obstacles.toFixed(2) + 'ms', 14, 85);
+      ctx.fillText('Effects: ' + debugProfile.effects.toFixed(2) + 'ms', 14, 100);
+      ctx.fillText('Oscilloscope: ' + debugProfile.osc.toFixed(2) + 'ms', 14, 115);
+      ctx.restore();
+    }
   }
 
   // --- Faint Glowing Audio Oscilloscope (Behind Score & Combo HUD) ---
@@ -8040,6 +8264,7 @@
       return;
     }
 
+    const tOsc0 = isDebugMode ? performance.now() : 0;
     const cw = hudOscilloscopeCanvas.width;
     const ch = hudOscilloscopeCanvas.height;
     if (cw === 0 || ch === 0) return;
@@ -8150,10 +8375,16 @@
       hudOscilloscopeCtx.stroke();
       hudOscilloscopeCtx.restore();
     }
+    if (isDebugMode) {
+      const tOsc1 = performance.now();
+      debugProfile.osc = debugProfile.osc * 0.9 + (tOsc1 - tOsc0) * 0.1;
+    }
   }
 
   // --- Main Animation Loop ---
   let lastTime = performance.now();
+  let lastLoopErrorTime = 0;
+  let lastLoopErrorMessage = '';
   function loop(now) {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
@@ -8165,7 +8396,13 @@
       renderMenuCanvases(now, dt);
       drawHudOscilloscope(now, dt);
     } catch (loopErr) {
-      console.warn('Game loop exception:', loopErr);
+      const errMsg = loopErr && loopErr.message ? loopErr.message : String(loopErr);
+      const stack = loopErr && loopErr.stack ? loopErr.stack : '';
+      if (errMsg !== lastLoopErrorMessage || now - lastLoopErrorTime > 1000) {
+        lastLoopErrorMessage = errMsg;
+        lastLoopErrorTime = now;
+        console.warn('Game loop exception (throttled 1/s):', errMsg, '\nStack:', stack);
+      }
     }
 
     requestAnimationFrame(loop);
