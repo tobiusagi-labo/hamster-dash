@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '51';
+  const ASSET_VERSION = '52';
   const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   let debugProfile = {
     bg: 0,
@@ -4759,92 +4759,33 @@
     ctx.restore();
   }
 
-  let bgCacheCanvas = null;
-  let bgCacheCtx = null;
-  let bgCacheKey = '';
-
-  function getStaticBgCanvas() {
-    const key = width + '_' + height + '_' + roomType + '_' + livingOption;
-    if (bgCacheCanvas && bgCacheKey === key) {
-      return bgCacheCanvas;
-    }
-    if (!bgCacheCanvas) {
-      bgCacheCanvas = document.createElement('canvas');
-      bgCacheCtx = bgCacheCanvas.getContext('2d');
-    }
-    const canvasW = width + 40;
-    const canvasH = height + 40;
-    if (bgCacheCanvas.width !== canvasW || bgCacheCanvas.height !== canvasH) {
-      bgCacheCanvas.width = canvasW;
-      bgCacheCanvas.height = canvasH;
-    }
-
-    const bCtx = bgCacheCtx;
-    bCtx.save();
-    bCtx.translate(20, 20);
-
-    if (roomType === 'rhythm') {
-      bCtx.fillStyle = '#090414';
-      bCtx.fillRect(-20, -20, width + 40, height + 40);
-
-      bCtx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
-      bCtx.lineWidth = 1.5;
-      const plankWidth = 48;
-      for (let x = plankWidth; x < width; x += plankWidth) {
-        bCtx.beginPath();
-        bCtx.moveTo(x, -20);
-        bCtx.lineTo(x, height + 20);
-        bCtx.stroke();
-      }
-
-      const rx = WALL_PADDING - 8;
-      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
-      const rw = width - (WALL_PADDING - 8) * 2;
-      const rh = height - ry - (WALL_PADDING - 8);
-
-      bCtx.fillStyle = '#140b29';
-      roundRect(bCtx, rx, ry, rw, rh, 20);
-      bCtx.fill();
-    } else {
-      const isIce = livingOption === 'ice';
-      bCtx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
-      bCtx.fillRect(-20, -20, width + 40, height + 40);
-
-      bCtx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
-      bCtx.lineWidth = 2;
-      const plankWidth = 48;
-      for (let x = plankWidth; x < width; x += plankWidth) {
-        bCtx.beginPath();
-        bCtx.moveTo(x, -20);
-        bCtx.lineTo(x, height + 20);
-        bCtx.stroke();
-      }
-
-      const rx = WALL_PADDING - 8;
-      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
-      const rw = width - (WALL_PADDING - 8) * 2;
-      const rh = height - ry - (WALL_PADDING - 8);
-
-      bCtx.fillStyle = isIce ? 'rgba(240, 249, 255, 0.75)' : 'rgba(254, 249, 195, 0.65)';
-      roundRect(bCtx, rx, ry, rw, rh, 20);
-      bCtx.fill();
-    }
-
-    bCtx.restore();
-    bgCacheKey = key;
-    return bgCacheCanvas;
-  }
-
   function drawBackground() {
-    const bgCanvas = getStaticBgCanvas();
-    ctx.drawImage(bgCanvas, -20, -20);
-
-    const rx = WALL_PADDING - 8;
-    const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
-    const rw = width - (WALL_PADDING - 8) * 2;
-    const rh = height - ry - (WALL_PADDING - 8);
-
     if (roomType === 'rhythm') {
+      // Dark Nightclub / DJ Dancefloor Background for RHYTHM ROOM
+      ctx.fillStyle = '#090414';
+      ctx.fillRect(-20, -20, width + 40, height + 40);
+
+      // Subtle dark club perspective grid lines
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.14)';
+      ctx.lineWidth = 1.5;
+      const plankWidth = 48;
+      for (let x = plankWidth; x < width; x += plankWidth) {
+        ctx.beginPath();
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
+        ctx.stroke();
+      }
+
+      const rx = WALL_PADDING - 8;
+      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
+      const rw = width - (WALL_PADDING - 8) * 2;
+      const rh = height - ry - (WALL_PADDING - 8);
+
+      // Deep dark club stage floor (clean & high-visibility without tile clutter)
+      ctx.fillStyle = '#140b29';
+      roundRect(ctx, rx, ry, rw, rh, 20);
+      ctx.fill();
+
       // Subtle soft ambient spotlight in the center of the club floor
       ctx.save();
       roundRect(ctx, rx + 4, ry + 4, rw - 8, rh - 8, 16);
@@ -4867,6 +4808,29 @@
       // Draw the 8-Beat Perimeter Dots & Orbiting Light
       drawRhythmPerimeter(rx, ry, rw, rh);
     } else {
+      // LIVING ROOM: Warm Wooden Floor OR Clean Simple Ice Blue (Ice+)
+      const isIce = livingOption === 'ice';
+      ctx.fillStyle = isIce ? '#e0f2fe' : '#fef3c7';
+      ctx.fillRect(-20, -20, width + 40, height + 40);
+
+      ctx.strokeStyle = isIce ? 'rgba(2, 132, 199, 0.12)' : 'rgba(217, 119, 6, 0.13)';
+      ctx.lineWidth = 2;
+      const plankWidth = 48;
+      for (let x = plankWidth; x < width; x += plankWidth) {
+        ctx.beginPath();
+        ctx.moveTo(x, -20);
+        ctx.lineTo(x, height + 20);
+        ctx.stroke();
+      }
+
+      const rx = WALL_PADDING - 8;
+      const ry = HUD_TOP_MARGIN + WALL_PADDING - 8;
+      const rw = width - (WALL_PADDING - 8) * 2;
+      const rh = height - ry - (WALL_PADDING - 8);
+
+      ctx.fillStyle = isIce ? 'rgba(240, 249, 255, 0.75)' : 'rgba(254, 249, 195, 0.65)';
+      roundRect(ctx, rx, ry, rw, rh, 20);
+      ctx.fill();
 
       ctx.strokeStyle =
         worldSlowTimer > 0
@@ -6743,7 +6707,7 @@
     // Rounded clip background
     timingTestCtx.save();
     timingTestCtx.beginPath();
-    timingTestCtx.roundRect(0, 0, cw, ch, 10);
+    roundRect(timingTestCtx, 0, 0, cw, ch, 10);
     timingTestCtx.clip();
 
     // Dark sleek cyber arena background
