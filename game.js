@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '52';
+  const ASSET_VERSION = '53';
   const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   let debugProfile = {
     bg: 0,
@@ -547,8 +547,8 @@
         return 0.65;
       }
       // リビングのHTML5 Audio経由（Web Audio GainNode -> dest -> limiter -> masterGain: volume適用）
-      // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.038）
-      return 0.038;
+      // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.076：従来の2倍）
+      return 0.076;
     }
 
     getMediaElementGain(audioElement) {
