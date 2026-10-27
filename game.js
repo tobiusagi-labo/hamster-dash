@@ -7,7 +7,7 @@
   'use strict';
 
   // --- DOM Elements ---
-  const ASSET_VERSION = '53';
+  const ASSET_VERSION = '54';
   const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   let debugProfile = {
     bg: 0,
@@ -547,8 +547,8 @@
         return 0.65;
       }
       // リビングのHTML5 Audio経由（Web Audio GainNode -> dest -> limiter -> masterGain: volume適用）
-      // 音圧の高すぎるMP3をリズムモードの体感音量と同等に心地よく抑える（0.076：従来の2倍）
-      return 0.076;
+      // リズムルーム(0.65)と自然に調和するしっかり聴こえる心地よい音量（0.28）
+      return 0.28;
     }
 
     getMediaElementGain(audioElement) {
@@ -5959,28 +5959,30 @@
     hCtx.scale(tapScale, tapScale);
 
     // Custom hub standing hamster image override for LIVING ROOM (Sunflower Seed Hamster)
-    if (roomType === 'living' && assets.hasImage('hub_hamster')) {
-      const img = assets.getImage('hub_hamster');
-      let dw = 138;
-      let dh = 154;
-      if (img && img.naturalWidth && img.naturalHeight) {
-        const aspect = img.naturalWidth / img.naturalHeight;
-        dh = 154;
-        dw = dh * aspect;
-        if (dw > 146) {
-          dw = 146;
-          dh = dw / aspect;
+    if (roomType === 'living') {
+      if (assets.hasImage('hub_hamster')) {
+        const img = assets.getImage('hub_hamster');
+        let dw = 138;
+        let dh = 154;
+        if (img && img.naturalWidth && img.naturalHeight) {
+          const aspect = img.naturalWidth / img.naturalHeight;
+          dh = 154;
+          dw = dh * aspect;
+          if (dw > 146) {
+            dw = 146;
+            dh = dw / aspect;
+          }
         }
+
+        // Soft ground shadow under hamster
+        hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
+        hCtx.beginPath();
+        hCtx.ellipse(0, 62 - bounce * 0.35, 44, 9.5, 0, 0, Math.PI * 2);
+        hCtx.fill();
+
+        assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
       }
-
-      // Soft ground shadow under hamster
-      hCtx.fillStyle = 'rgba(120, 53, 15, 0.22)';
-      hCtx.beginPath();
-      hCtx.ellipse(0, 62 - bounce * 0.35, 44, 9.5, 0, 0, Math.PI * 2);
-      hCtx.fill();
-
-      assets.drawImage(hCtx, 'hub_hamster', 0, 0, dw, dh);
-
+      // Do not draw geometric hamster while hub_hamster.png is loading
       hCtx.restore();
       return;
     }
@@ -6034,17 +6036,11 @@
           }
         }
         assets.drawImage(hCtx, 'hub_hamster_rhythm', 0, 0, hamsterW, hamsterH);
-      } else {
-        // Fallback procedural DJ hamster body if image is not loaded
-        drawProceduralStandingHamsterBody(hCtx, now, bounce);
       }
-
+      // Do not draw geometric hamster while hub_hamster_rhythm.png is loading
       hCtx.restore();
       return;
     }
-
-    // Default Fallback Standing Hamster Body for Living Room
-    drawProceduralStandingHamsterBody(hCtx, now, bounce);
 
     hCtx.restore();
   }
